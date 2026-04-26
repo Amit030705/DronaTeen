@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DronTeen Grocery</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+    
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <div class="header-top">
+                <div class="logo">
+                    <i class="fas fa-bolt"></i>
+                    <span style="margin-right: 150px">DronTeen</span>
+                </div>
+                <div class="location">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>Greater Noida, Noida</span>
+                </div>
+                <div class="search-bar">
+                    <input type="text" placeholder="Search for products...">
+                    <i class="fas fa-search"></i>
+                </div>
+                <div class="header-actions">
+                    <div class="login-btn">
+                        <i class="fas fa-user"></i>
+                        <span style="margin-left: 100px">Login</span>
+                    </div>
+                    <div>
+                        <i class="fas fa-shopping-cart"></i>
+                        <span>Cart</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Main Content -->
+    <div class="container">
+        <div class="main-content">
+            <!-- Products Section - Dynamic Rendering -->
+            <div class="products">
+                <div class="products-header">
+                    <h2>Choose Your Meal</h2>
+                    <div>
+                        Sort by:
+                        <select id="sort-products">
+                            <option value="popularity">Popularity</option>
+                            <option value="price-low-high">Price - Low to High</option>
+                            <option value="price-high-low">Price - High to Low</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="products-grid" id="products-grid"></div>
+            </div>
+            
+            <!-- Cart Sidebar -->
+            <div class="cart">
+                <h2>
+                    <span>Your Cart</span>
+                    <span id="cart-count">(0 items)</span>
+                </h2>
+                <div class="cart-items" id="cart-items">
+                    <div class="empty-cart">
+                        <i class="fas fa-shopping-cart"></i>
+                        <p>Your cart is empty</p>
+                    </div>
+                </div>
+                <div class="cart-summary">
+                    <div class="summary-row">
+                        <span>Item Total</span>
+                        <span id="item-total">₹0</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Delivery Fee</span>
+                        <span>₹25</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Platform Fee</span>
+                        <span>₹2</span>
+                    </div>
+                    <div class="summary-row total">
+                        <span>Total</span>
+                        <span id="cart-total">₹0</span>
+                    </div>
+                    <button class="checkout-btn" id="checkout-btn">Proceed to Checkout</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div class="modal" id="payment-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Select Payment Method</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="payment-options">
+                <label class="payment-option">
+                    <input type="radio" name="payment" value="card">
+                    <i class="fas fa-credit-card"></i>
+                    Credit/Debit Card
+                </label>
+                <label class="payment-option">
+                    <input type="radio" name="payment" value="upi" checked>
+                    <i class="fas fa-mobile-alt"></i>
+                    UPI
+                    <input type="text" id="upi-id" placeholder="Enter UPI ID" style="margin-left: 10px; padding: 5px; display: none;">
+                </label>
+                <label class="payment-option">
+                    <input type="radio" name="payment" value="cod">
+                    <i class="fas fa-money-bill-wave"></i>
+                    Cash on Delivery
+                </label>
+            </div>
+            <button class="pay-btn" id="pay-btn">Pay Now</button>
+        </div>
+    </div>
+
+    <!-- Receipt Modal -->
+    <div class="modal" id="receipt-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Order Receipt</h2>
+                <span class="close-receipt">&times;</span>
+            </div>
+            <div class="receipt-content" id="receipt-content">
+                <!-- Receipt content will be generated here -->
+            </div>
+            <button class="print-btn" id="print-btn">Print Receipt</button>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div class="modal" id="login-modal">
+        <div class="modal-content" style="max-width: 350px;">
+            <div class="modal-header">
+                <h2>User Login</h2>
+                <span class="close-login">&times;</span>
+            </div>
+            <form id="login-form">
+                <div style="margin-bottom:12px;">
+                    <label>Email</label><br>
+                    <input type="email" id="login-email" required>
+                </div>
+                <div style="margin-bottom:18px;">
+                    <label>Password</label><br>
+                    <input type="password" id="login-password" required>
+                </div>
+                <button type="submit" class="pay-btn" style="margin-top:0;">Login</button>
+            </form>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
