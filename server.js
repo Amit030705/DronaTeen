@@ -1,247 +1,168 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT ;
+const PORT = process.env.PORT || 3000;
 
-// Middleware
+// Security & middleware (CSP disabled for development)
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json());
-app.use(express.static('.')); // Serve static files
+app.use(express.static('.')); // serve static files (HTML, CSS, JS)
+
+// Rate limiting
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+app.use('/api/', limiter);
 
 // MongoDB connection
-const MONGODB_URI = process.env.MONGODB_URI ;
-
-mongoose.connect(MONGODB_URI, {
+mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
-})
-.then(() => console.log('Connected to MongoDB'))
-.catch(err => console.error('MongoDB connection error:', err));
+}).then(() => console.log('✅ MongoDB connected'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
 
-// Define schemas
+// ------------------------ SCHEMAS ------------------------
+const orderItemSchema = new mongoose.Schema({
+    id: String, name: String, price: Number, quantity: Number
+});
 const orderSchema = new mongoose.Schema({
-    orderId: {
-        type: String,
-        required: true,
-        unique: true
-    },
-    items: [{
-        id: String,
-        name: String,
-        price: Number,
-        quantity: Number
-    }],
-    total: {
-        type: Number,
-        required: true
-    },
+    orderId: { type: String, required: true, unique: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    items: [orderItemSchema],
+    total: Number,
+    paymentMethod: String,
     paymentId: String,
-    paymentMethod: {
-        type: String,
-        required: true
-    },
-    upiId: String,
-    customerName: String,
-    customerEmail: String,
-    status: {
-        type: String,
-        default: 'pending'
-    },
-    date: {
-        type: Date,
-        default: Date.now
-    }
+    status: { type: String, default: 'pending' },
+    createdAt: { type: Date, default: Date.now }
 });
-
 const userSchema = new mongoose.Schema({
-    name: {
-        type: String,
-        required: true
-    },
-    email: {
-        type: String,
-        required: true,
-        unique: true
-    },
-    upiId: String,
-    orders: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Order'
-    }],
-    createdAt: {
-        type: Date,
-        default: Date.now
-    }
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    address: { type: String, default: 'Greater Noida, Noida' },
+    prefPayment: { type: String, default: 'UPI' },
+    lastLogin: Date,
+    createdAt: { type: Date, default: Date.now }
+});
+const transactionSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    orderId: String,
+    amount: Number,
+    type: { type: String, enum: ['purchase', 'refund'], default: 'purchase' },
+    paymentId: String,
+    createdAt: { type: Date, default: Date.now }
 });
 
-// Create models
-const Order = mongoose.model('Order', orderSchema);
 const User = mongoose.model('User', userSchema);
+const Order = mongoose.model('Order', orderSchema);
+const Transaction = mongoose.model('Transaction', transactionSchema);
 
-// API routes
-app.post('/api/orders', async (req, res) => {
+// ------------------------ EMAIL SETUP ------------------------
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+});
+async function sendAdminAlert(action, user, req, extra = {}) {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (!adminEmail) return console.warn('⚠️ ADMIN_EMAIL missing');
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+    const html = `<h3>🔔 DronTeen Alert: ${action}</h3><p><strong>User:</strong> ${user.name} (${user.email})</p><p><strong>Time:</strong> ${new Date().toLocaleString()}</p><p><strong>IP:</strong> ${ip}</p><p><strong>Device/Browser:</strong> ${userAgent}</p>${extra.orderAmount ? `<p><strong>Order Amount:</strong> ₹${extra.orderAmount}</p>` : ''}${extra.message ? `<p><strong>Details:</strong> ${extra.message}</p>` : ''}`;
     try {
-        const { items, total, paymentId, paymentMethod, upiId, customerName, customerEmail } = req.body;
-        
-        // Generate a unique order ID
-        const orderId = `ORD${Date.now()}${Math.floor(Math.random() * 1000)}`;
-        
-        const order = new Order({
-            orderId,
-            items,
-            total,
-            paymentId,
-            paymentMethod,
-            upiId,
-            customerName,
-            customerEmail
-        });
-        
-        await order.save();
-        
-        // Check if user exists, if not create one
-        let user = await User.findOne({ email: customerEmail });
-        if (!user) {
-            user = new User({
-                name: customerName,
-                email: customerEmail,
-                upiId: upiId
-            });
-        }
-        
-        // Add order to user's orders
-        user.orders.push(order._id);
+        await transporter.sendMail({ from: process.env.EMAIL_USER, to: adminEmail, subject: `[DronTeen] ${action}`, html });
+        console.log(`📧 Email sent: ${action}`);
+    } catch (err) { console.error('Email failed:', err.message); }
+}
+
+// ------------------------ AUTH MIDDLEWARE ------------------------
+const authMiddleware = async (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ success: false, message: 'No token' });
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.userId = decoded.userId;
+        next();
+    } catch (err) { return res.status(401).json({ success: false, message: 'Invalid token' }); }
+};
+
+// ------------------------ AUTH ROUTES ------------------------
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        const { name, email, password } = req.body;
+        if (await User.findOne({ email })) return res.status(400).json({ success: false, message: 'Email exists' });
+        const hashed = await bcrypt.hash(password, 10);
+        const user = new User({ name, email, password: hashed });
         await user.save();
-        
-        res.status(201).json({
-            success: true,
-            message: 'Order created successfully',
-            orderId: order.orderId,
-            order
-        });
-    } catch (error) {
-        console.error('Error creating order:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to create order',
-            error: error.message
-        });
-    }
+        const token = jwt.sign({ userId: user._id, email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        sendAdminAlert('New User Registration', user, req);
+        res.json({ success: true, token, user: { name, email } });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// Get all orders
-app.get('/api/orders', async (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
     try {
-        const orders = await Order.find().sort({ date: -1 });
-        res.json({
-            success: true,
-            orders
-        });
-    } catch (error) {
-        console.error('Error fetching orders:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch orders',
-            error: error.message
-        });
-    }
+        const { email, password } = req.body;
+        const user = await User.findOne({ email });
+        if (!user || !(await bcrypt.compare(password, user.password)))
+            return res.status(401).json({ success: false, message: 'Invalid credentials' });
+        user.lastLogin = new Date();
+        await user.save();
+        const token = jwt.sign({ userId: user._id, email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        sendAdminAlert('User Login', user, req);
+        res.json({ success: true, token, user: { name: user.name, email: user.email, address: user.address, prefPayment: user.prefPayment } });
+    } catch (err) { res.status(500).json({ success: false, message: 'Server error' }); }
 });
 
-// Get order by ID
-app.get('/api/orders/:orderId', async (req, res) => {
+// ------------------------ USER & DASHBOARD ROUTES ------------------------
+app.get('/api/user/profile', authMiddleware, async (req, res) => {
     try {
-        const order = await Order.findOne({ orderId: req.params.orderId });
-        if (!order) {
-            return res.status(404).json({
-                success: false,
-                message: 'Order not found'
-            });
-        }
-        
-        res.json({
-            success: true,
-            order
-        });
-    } catch (error) {
-        console.error('Error fetching order:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch order',
-            error: error.message
-        });
-    }
+        const user = await User.findById(req.userId).select('-password');
+        res.json({ success: true, user });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
-
-// Get user by email and their orders
-app.get('/api/users/:email', async (req, res) => {
+app.put('/api/user/profile', authMiddleware, async (req, res) => {
     try {
-        const user = await User.findOne({ email: req.params.email }).populate('orders');
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
-        }
-        
-        res.json({
-            success: true,
-            user
-        });
-    } catch (error) {
-        console.error('Error fetching user:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch user',
-            error: error.message
-        });
-    }
+        const { name, email, password, address, prefPayment } = req.body;
+        const updates = { name, email, address, prefPayment };
+        if (password?.trim()) updates.password = await bcrypt.hash(password, 10);
+        const user = await User.findByIdAndUpdate(req.userId, updates, { new: true }).select('-password');
+        sendAdminAlert('Profile Updated', user, req);
+        res.json({ success: true, user });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
-
-// Update order status
-app.put('/api/orders/:orderId', async (req, res) => {
+app.get('/api/user/orders', authMiddleware, async (req, res) => {
     try {
-        const { status } = req.body;
-        const order = await Order.findOneAndUpdate(
-            { orderId: req.params.orderId },
-            { status },
-            { new: true }
-        );
-        
-        if (!order) {
-            return res.status(404).json({
-                success: false,
-                message: 'Order not found'
-            });
-        }
-        
-        res.json({
-            success: true,
-            message: 'Order status updated successfully',
-            order
-        });
-    } catch (error) {
-        console.error('Error updating order:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to update order',
-            error: error.message
-        });
-    }
+        const orders = await Order.find({ userId: req.userId }).sort({ createdAt: -1 });
+        res.json({ success: true, orders });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+app.get('/api/user/transactions', authMiddleware, async (req, res) => {
+    try {
+        const transactions = await Transaction.find({ userId: req.userId }).sort({ createdAt: -1 });
+        res.json({ success: true, transactions });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+app.post('/api/orders', authMiddleware, async (req, res) => {
+    try {
+        const { items, total, paymentMethod, paymentId } = req.body;
+        const user = await User.findById(req.userId);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        const orderId = `ORD${Date.now()}${Math.floor(Math.random() * 1000)}`;
+        const order = new Order({ orderId, userId: req.userId, items, total, paymentMethod, paymentId, status: 'confirmed' });
+        await order.save();
+        await new Transaction({ userId: req.userId, orderId, amount: total, type: 'purchase', paymentId }).save();
+        sendAdminAlert('New Order Placed', user, req, { orderAmount: total });
+        res.status(201).json({ success: true, orderId });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-    res.json({
-        success: true,
-        message: 'Server is running',
-        timestamp: new Date().toISOString()
-    });
-});
+app.get('/api/health', (req, res) => res.json({ success: true, message: 'Server running' }));
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Server on http://localhost:${PORT}`));

@@ -2,161 +2,396 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DronTeen Grocery</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>DronTeen – Fast Grocery Delivery</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', system-ui, sans-serif; }
+        body { background: #fafcff; overflow-x: hidden; }
+        .header {
+            background: white;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(8px);
+            background: rgba(255,255,255,0.98);
+        }
+        .header-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .logo { display: flex; align-items: center; gap: 8px; font-size: 28px; font-weight: 800; color: #0c831f; }
+        .logo i { font-size: 32px; }
+        .location { display: flex; align-items: center; gap: 8px; background: #f2f5f2; padding: 8px 16px; border-radius: 40px; font-weight: 500; }
+        .search-bar { flex: 1; max-width: 400px; position: relative; }
+        .search-bar input { width: 100%; padding: 12px 20px; border-radius: 40px; border: 1px solid #e2e8f0; outline: none; }
+        .search-bar input:focus { border-color: #0c831f; box-shadow: 0 0 0 3px rgba(12,131,31,0.1); }
+        .search-bar i { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+        .header-actions { display: flex; align-items: center; gap: 20px; }
+        .user-info { display: flex; align-items: center; gap: 8px; background: #f2f5f2; padding: 8px 16px; border-radius: 40px; cursor: pointer; }
+        .cart-icon { position: relative; cursor: pointer; font-size: 24px; color: #0c831f; }
+        .cart-badge { position: absolute; top: -8px; right: -12px; background: #dc2626; color: white; border-radius: 30px; padding: 2px 8px; font-size: 12px; font-weight: bold; }
+        .main-container { max-width: 1400px; margin: 24px auto; padding: 0 24px; display: flex; gap: 32px; flex-wrap: wrap; }
+        .products-section { flex: 2.5; }
+        .products-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+        .products-header h2 { font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #0c831f, #2b9348); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .sort-select { padding: 8px 16px; border-radius: 40px; border: 1px solid #e2e8f0; background: white; cursor: pointer; }
+        .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 28px; }
+        .product-card { background: white; border-radius: 28px; overflow: hidden; transition: all 0.25s ease; box-shadow: 0 8px 20px rgba(0,0,0,0.02); border: 1px solid #edf2f0; }
+        .product-card:hover { transform: translateY(-6px); box-shadow: 0 20px 30px -12px rgba(12,131,31,0.15); }
+        .product-image { height: 200px; background: #f9fef9; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .product-image img { max-width: 100%; max-height: 160px; object-fit: contain; }
+        .product-info { padding: 16px 18px 20px; }
+        .product-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+        .product-weight { font-size: 13px; color: #64748b; margin-bottom: 12px; }
+        .product-price { font-size: 22px; font-weight: 800; color: #0c831f; margin-bottom: 16px; }
+        .add-to-cart { background: linear-gradient(95deg, #0c831f, #2b9348); border: none; width: 100%; padding: 12px; border-radius: 60px; color: white; font-weight: 600; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .add-to-cart:hover { background: #096e1a; transform: scale(0.98); }
+        .cart-sidebar { flex: 1.2; background: white; border-radius: 32px; box-shadow: 0 20px 35px -12px rgba(0,0,0,0.08); padding: 24px; position: sticky; top: 100px; height: fit-content; border: 1px solid #edf2f0; }
+        .cart-header { font-size: 22px; font-weight: 700; display: flex; justify-content: space-between; border-bottom: 2px solid #eaf6ea; padding-bottom: 16px; margin-bottom: 20px; }
+        .cart-items-container { max-height: 380px; overflow-y: auto; margin-bottom: 20px; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f1f5f1; }
+        .cart-item-info h4 { font-size: 15px; font-weight: 600; }
+        .cart-item-price { color: #0c831f; font-weight: 600; }
+        .cart-quantity { display: flex; align-items: center; gap: 10px; }
+        .qty-btn { background: #f1f5f1; border: none; width: 28px; height: 28px; border-radius: 30px; font-weight: bold; cursor: pointer; }
+        .empty-cart { text-align: center; padding: 40px 20px; color: #94a3b8; }
+        .cart-summary { border-top: 2px solid #eaf6ea; padding-top: 20px; }
+        .summary-row { display: flex; justify-content: space-between; margin-bottom: 12px; }
+        .total-row { font-weight: 800; font-size: 18px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #cbdccb; }
+        .checkout-btn { background: #0c831f; width: 100%; padding: 16px; border: none; border-radius: 60px; color: white; font-weight: 700; font-size: 16px; margin-top: 20px; cursor: pointer; transition: 0.2s; }
+        .checkout-btn:disabled { background: #cbd5c1; cursor: not-allowed; }
+        /* Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal-content { background: white; border-radius: 32px; padding: 28px; width: 400px; max-width: 90%; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .close-modal { font-size: 28px; cursor: pointer; }
+        .payment-option { display: flex; align-items: center; gap: 12px; padding: 15px; border: 1px solid #e2e8f0; border-radius: 20px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s; }
+        .payment-option:hover { border-color: #0c831f; background: #f5fef5; }
+        .pay-btn { background: #0c831f; color: white; border: none; border-radius: 60px; padding: 14px; width: 100%; font-weight: bold; margin-top: 16px; cursor: pointer; }
+        .upi-input { margin-top: 10px; display: none; }
+        .upi-input input { width: 100%; padding: 10px; border-radius: 40px; border: 1px solid #ddd; }
+        .toast-msg { position: fixed; bottom: 25px; right: 25px; background: #1e293b; color: white; padding: 12px 24px; border-radius: 60px; z-index: 1000; animation: fadeup 0.3s ease; }
+        @keyframes fadeup { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+        @media (max-width: 1024px) { .main-container { flex-direction: column; } .cart-sidebar { position: static; margin-top: 24px; } }
+    </style>
 </head>
 <body>
-    
-    <!-- Header -->
-    <header>
-        <div class="container">
-            <div class="header-top">
-                <div class="logo">
-                    <i class="fas fa-bolt"></i>
-                    <span style="margin-right: 150px">DronTeen</span>
-                </div>
-                <div class="location">
-                    <i class="fas fa-map-marker-alt"></i>
-                    <span>Greater Noida, Noida</span>
-                </div>
-                <div class="search-bar">
-                    <input type="text" placeholder="Search for products...">
-                    <i class="fas fa-search"></i>
-                </div>
-                <div class="header-actions">
-                    <div class="login-btn">
-                        <i class="fas fa-user"></i>
-                        <span style="margin-left: 100px">Login</span>
-                    </div>
-                    <div>
-                        <i class="fas fa-shopping-cart"></i>
-                        <span>Cart</span>
-                    </div>
-                </div>
+
+<div class="header">
+    <div class="header-container">
+        <div class="logo"><i class="fas fa-bolt"></i> DronTeen</div>
+        <div class="location"><i class="fas fa-map-marker-alt"></i> Greater Noida • Noida</div>
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="Search for snacks, drinks, meals...">
+            <i class="fas fa-search"></i>
+        </div>
+        <div class="header-actions">
+            <div class="user-info" id="userMenuBtn">
+                <i class="fas fa-user-circle"></i> <span id="userEmailShort">Account</span>
+            </div>
+            <div class="cart-icon" id="cartIconMobile">
+                <i class="fas fa-shopping-bag"></i>
+                <span class="cart-badge" id="cartCountBadge">0</span>
             </div>
         </div>
-    </header>
-    
-    <!-- Main Content -->
-    <div class="container">
-        <div class="main-content">
-            <!-- Products Section - Dynamic Rendering -->
-            <div class="products">
-                <div class="products-header">
-                    <h2>Choose Your Meal</h2>
-                    <div>
-                        Sort by:
-                        <select id="sort-products">
-                            <option value="popularity">Popularity</option>
-                            <option value="price-low-high">Price - Low to High</option>
-                            <option value="price-high-low">Price - High to Low</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="products-grid" id="products-grid"></div>
-            </div>
-            
-            <!-- Cart Sidebar -->
-            <div class="cart">
-                <h2>
-                    <span>Your Cart</span>
-                    <span id="cart-count">(0 items)</span>
-                </h2>
-                <div class="cart-items" id="cart-items">
-                    <div class="empty-cart">
-                        <i class="fas fa-shopping-cart"></i>
-                        <p>Your cart is empty</p>
-                    </div>
-                </div>
-                <div class="cart-summary">
-                    <div class="summary-row">
-                        <span>Item Total</span>
-                        <span id="item-total">₹0</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Delivery Fee</span>
-                        <span>₹25</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Platform Fee</span>
-                        <span>₹2</span>
-                    </div>
-                    <div class="summary-row total">
-                        <span>Total</span>
-                        <span id="cart-total">₹0</span>
-                    </div>
-                    <button class="checkout-btn" id="checkout-btn">Proceed to Checkout</button>
-                </div>
-            </div>
+    </div>
+</div>
+
+<div class="main-container">
+    <div class="products-section">
+        <div class="products-header">
+            <h2>🔥 Today's Crave</h2>
+            <select id="sortProducts" class="sort-select">
+                <option value="popularity">Popularity</option>
+                <option value="price-low-high">Price: Low to High</option>
+                <option value="price-high-low">Price: High to Low</option>
+            </select>
         </div>
+        <div class="products-grid" id="productsGrid"></div>
     </div>
 
-    <!-- Payment Modal -->
-    <div class="modal" id="payment-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Select Payment Method</h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <div class="payment-options">
-                <label class="payment-option">
-                    <input type="radio" name="payment" value="card">
-                    <i class="fas fa-credit-card"></i>
-                    Credit/Debit Card
-                </label>
-                <label class="payment-option">
-                    <input type="radio" name="payment" value="upi" checked>
-                    <i class="fas fa-mobile-alt"></i>
-                    UPI
-                    <input type="text" id="upi-id" placeholder="Enter UPI ID" style="margin-left: 10px; padding: 5px; display: none;">
-                </label>
-                <label class="payment-option">
-                    <input type="radio" name="payment" value="cod">
-                    <i class="fas fa-money-bill-wave"></i>
-                    Cash on Delivery
-                </label>
-            </div>
-            <button class="pay-btn" id="pay-btn">Pay Now</button>
+    <aside class="cart-sidebar">
+        <div class="cart-header">
+            <span>Your Cart</span>
+            <span id="cartItemCountText">(0 items)</span>
         </div>
-    </div>
+        <div class="cart-items-container" id="cartItemsContainer">
+            <div class="empty-cart"><i class="fas fa-bag-shopping" style="font-size:48px;"></i><p>Cart is empty</p></div>
+        </div>
+        <div class="cart-summary">
+            <div class="summary-row"><span>Item Total</span><span id="itemTotal">₹0</span></div>
+            <div class="summary-row"><span>Delivery Fee</span><span>₹25</span></div>
+            <div class="summary-row"><span>Platform Fee</span><span>₹2</span></div>
+            <div class="summary-row total-row"><span>Total</span><span id="cartTotalAmount">₹0</span></div>
+            <button class="checkout-btn" id="checkoutBtn">Proceed to Checkout</button>
+        </div>
+    </aside>
+</div>
 
-    <!-- Receipt Modal -->
-    <div class="modal" id="receipt-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Order Receipt</h2>
-                <span class="close-receipt">&times;</span>
-            </div>
-            <div class="receipt-content" id="receipt-content">
-                <!-- Receipt content will be generated here -->
-            </div>
-            <button class="print-btn" id="print-btn">Print Receipt</button>
+<!-- Payment Modal -->
+<div id="paymentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Select Payment Method</h2>
+            <span class="close-modal">&times;</span>
         </div>
+        <div class="payment-options">
+            <label class="payment-option">
+                <input type="radio" name="payment" value="card" checked> <i class="fas fa-credit-card"></i> Credit/Debit Card
+            </label>
+            <label class="payment-option">
+                <input type="radio" name="payment" value="upi"> <i class="fas fa-mobile-alt"></i> UPI
+            </label>
+            <div class="upi-input" id="upiInputDiv">
+                <input type="text" id="upiId" placeholder="Enter UPI ID (e.g., name@okhdfcbank)">
+            </div>
+            <label class="payment-option">
+                <input type="radio" name="payment" value="cod"> <i class="fas fa-money-bill-wave"></i> Cash on Delivery
+            </label>
+        </div>
+        <button class="pay-btn" id="payNowBtn">Pay Now</button>
     </div>
+</div>
 
-    <!-- Login Modal -->
-    <div class="modal" id="login-modal">
-        <div class="modal-content" style="max-width: 350px;">
-            <div class="modal-header">
-                <h2>User Login</h2>
-                <span class="close-login">&times;</span>
-            </div>
-            <form id="login-form">
-                <div style="margin-bottom:12px;">
-                    <label>Email</label><br>
-                    <input type="email" id="login-email" required>
+<script>
+    // ---------- PRODUCTS ----------
+    let products = [
+        { id: "1", name: "Chole Bhature", price: 120, weight: "2 Bhature + Chole", image: "https://madhurasrecipe.com/wp-content/uploads/2025/09/MR-Chole-Bhature-featured.jpg", popularity: 8 },
+        { id: "2", name: "Samosa", price: 40, weight: "1 piece", image: "https://recipes.timesofindia.com/thumb/61050397.cms?width=1200&height=900", popularity: 10 },
+        { id: "3", name: "Veg Puff", price: 25, weight: "1 piece", image: "https://www.elloras.in/cdn/shop/products/Mushroom-Puff_693x.jpg?v=1660911957", popularity: 9 },
+        { id: "4", name: "Hot Coffee", price: 30, weight: "1 cup", image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTa0tizr4Mp3AZDTp-nJLGAp5QQsQhC2u0PNw&s", popularity: 7 },
+        { id: "5", name: "Chole Kulche", price: 80, weight: "2 kulche + chole", image: "https://media-assets.swiggy.com/swiggy/image/upload/f_auto,q_auto,fl_lossy/pdwsoobxs6wzul1jqljr", popularity: 7 },
+        { id: "6", name: "Aloo Paratha", price: 60, weight: "2 pieces", image: "https://www.indianhealthyrecipes.com/wp-content/uploads/2020/08/aloo-paratha-recipe-500x500.jpg", popularity: 6 },
+        { id: "7", name: "Coca-Cola 1L", price: 20, weight: "1 litre", image: "https://www.coca-cola.com/content/dam/onexp/us/en/brands/coca-cola-spiced/coke-product-category-card.png", popularity: 5 },
+        { id: "8", name: "Dairy Milk", price: 35, weight: "45g", image: "https://m.media-amazon.com/images/I/718ecxjECuL.jpg", popularity: 6 }
+    ];
+
+    let cart = [];
+    let token = localStorage.getItem('droneToken');
+    if (!token && window.location.pathname !== '/login.html') window.location.href = '/login.html';
+
+    // DOM
+    const productsGrid = document.getElementById('productsGrid');
+    const sortSelect = document.getElementById('sortProducts');
+    const cartContainer = document.getElementById('cartItemsContainer');
+    const cartItemCountText = document.getElementById('cartItemCountText');
+    const itemTotalSpan = document.getElementById('itemTotal');
+    const cartTotalSpan = document.getElementById('cartTotalAmount');
+    const cartCountBadge = document.getElementById('cartCountBadge');
+    const checkoutBtn = document.getElementById('checkoutBtn');
+    const paymentModal = document.getElementById('paymentModal');
+    const closeModal = document.querySelector('.close-modal');
+    const payNowBtn = document.getElementById('payNowBtn');
+    const upiInputDiv = document.getElementById('upiInputDiv');
+    const upiIdInput = document.getElementById('upiId');
+    const userEmailSpan = document.getElementById('userEmailShort');
+
+    const userEmail = localStorage.getItem('userEmail') || '';
+    if (userEmail) userEmailSpan.innerText = userEmail.split('@')[0];
+
+    function showToast(msg, isError = false) {
+        let toast = document.createElement('div');
+        toast.className = 'toast-msg';
+        toast.style.background = isError ? '#dc3545' : '#1e293b';
+        toast.innerText = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    // Render products
+    function renderProducts(productList) {
+        productsGrid.innerHTML = '';
+        productList.forEach(prod => {
+            const card = document.createElement('div');
+            card.className = 'product-card';
+            card.innerHTML = `
+                <div class="product-image"><img src="${prod.image}" alt="${prod.name}" loading="lazy"></div>
+                <div class="product-info">
+                    <div class="product-name">${prod.name}</div>
+                    <div class="product-weight">${prod.weight}</div>
+                    <div class="product-price">₹${prod.price}</div>
+                    <button class="add-to-cart" data-id="${prod.id}" data-name="${prod.name}" data-price="${prod.price}"><i class="fas fa-plus-circle"></i> Add to Cart</button>
                 </div>
-                <div style="margin-bottom:18px;">
-                    <label>Password</label><br>
-                    <input type="password" id="login-password" required>
-                </div>
-                <button type="submit" class="pay-btn" style="margin-top:0;">Login</button>
-            </form>
-        </div>
-    </div>
-    <script src="script.js"></script>
+            `;
+            productsGrid.appendChild(card);
+        });
+        document.querySelectorAll('.add-to-cart').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.dataset.id, name = btn.dataset.name, price = parseInt(btn.dataset.price);
+                const existing = cart.find(i => i.id === id);
+                if (existing) existing.quantity++;
+                else cart.push({ id, name, price, quantity: 1 });
+                updateCartUI();
+                showToast(`🛒 ${name} added`);
+            });
+        });
+    }
+
+    function updateCartUI() {
+        if (cart.length === 0) {
+            cartContainer.innerHTML = `<div class="empty-cart"><i class="fas fa-bag-shopping" style="font-size:48px;"></i><p>Cart is empty</p></div>`;
+        } else {
+            cartContainer.innerHTML = '';
+            cart.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'cart-item';
+                div.innerHTML = `
+                    <div class="cart-item-info"><h4>${item.name}</h4><div class="cart-item-price">₹${item.price}</div></div>
+                    <div class="cart-quantity">
+                        <button class="qty-btn minus" data-id="${item.id}">-</button>
+                        <span>${item.quantity}</span>
+                        <button class="qty-btn plus" data-id="${item.id}">+</button>
+                    </div>
+                `;
+                cartContainer.appendChild(div);
+            });
+            document.querySelectorAll('.qty-btn.minus').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.dataset.id;
+                    const item = cart.find(i => i.id === id);
+                    if (item.quantity > 1) item.quantity--;
+                    else cart = cart.filter(i => i.id !== id);
+                    updateCartUI();
+                });
+            });
+            document.querySelectorAll('.qty-btn.plus').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.dataset.id;
+                    cart.find(i => i.id === id).quantity++;
+                    updateCartUI();
+                });
+            });
+        }
+        const totalItems = cart.reduce((sum, i) => sum + i.quantity, 0);
+        const totalValue = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+        cartItemCountText.innerText = `(${totalItems} ${totalItems === 1 ? 'item' : 'items'})`;
+        cartCountBadge.innerText = totalItems;
+        itemTotalSpan.innerText = `₹${totalValue}`;
+        cartTotalSpan.innerText = `₹${totalValue + 25 + 2}`;
+        checkoutBtn.disabled = cart.length === 0;
+    }
+
+    function sortProducts() {
+        let sorted = [...products];
+        const val = sortSelect.value;
+        if (val === 'price-low-high') sorted.sort((a,b) => a.price - b.price);
+        else if (val === 'price-high-low') sorted.sort((a,b) => b.price - a.price);
+        else sorted.sort((a,b) => b.popularity - a.popularity);
+        renderProducts(sorted);
+    }
+    sortSelect.addEventListener('change', sortProducts);
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        renderProducts(products.filter(p => p.name.toLowerCase().includes(term)));
+    });
+
+    // Payment modal logic
+    checkoutBtn.addEventListener('click', () => {
+        if (cart.length === 0) return;
+        paymentModal.style.display = 'flex';
+        document.querySelectorAll('input[name="payment"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                upiInputDiv.style.display = this.value === 'upi' ? 'block' : 'none';
+            });
+        });
+    });
+    closeModal.addEventListener('click', () => paymentModal.style.display = 'none');
+    window.addEventListener('click', (e) => { if (e.target === paymentModal) paymentModal.style.display = 'none'; });
+
+    // Save order to backend
+    async function saveOrder(paymentId, paymentMethod, upiIdValue = null) {
+        const totalValue = cart.reduce((s,i) => s + i.price * i.quantity, 0);
+        const finalAmount = totalValue + 25 + 2;
+        try {
+            const response = await fetch('/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ items: cart, total: finalAmount, paymentMethod, paymentId })
+            });
+            const data = await response.json();
+            if (data.success) {
+                showToast('✅ Order placed successfully! Redirecting...');
+                cart = [];
+                updateCartUI();
+                paymentModal.style.display = 'none';
+                setTimeout(() => window.location.href = '/dashboard.html', 1500);
+            } else {
+                showToast('❌ Order failed: ' + data.message, true);
+            }
+        } catch (err) {
+            showToast('❌ Server error. Please try again.', true);
+        }
+    }
+
+    // Process payment
+    payNowBtn.addEventListener('click', () => {
+        const selected = document.querySelector('input[name="payment"]:checked').value;
+        if (selected === 'cod') {
+            saveOrder(null, 'cod', null);
+        } else if (selected === 'upi') {
+            const upiId = upiIdInput.value.trim();
+            if (!upiId) {
+                showToast('Please enter UPI ID', true);
+                return;
+            }
+            // For UPI, we can either directly save order (no payment gateway) or integrate Razorpay UPI
+            // For simplicity, we'll treat UPI as a direct success (mock payment)
+            saveOrder('UPI_' + Date.now(), 'upi', upiId);
+        } else if (selected === 'card') {
+            const totalValue = cart.reduce((s,i) => s + i.price * i.quantity, 0);
+            const finalAmount = totalValue + 25 + 2;
+            const options = {
+                key: "rzp_test_RP4iA95YzW2bj1",
+                amount: finalAmount * 100,
+                currency: "INR",
+                name: "DronTeen",
+                description: "Grocery Order",
+                handler: function(response) {
+                    saveOrder(response.razorpay_payment_id, 'card', null);
+                },
+                theme: { color: "#0c831f" }
+            };
+            const rzp = new Razorpay(options);
+            rzp.open();
+        }
+    });
+
+    // Logout
+    document.getElementById('userMenuBtn').addEventListener('click', () => {
+        if (confirm('Logout?')) {
+            localStorage.removeItem('droneToken');
+            localStorage.removeItem('userEmail');
+            window.location.href = '/login.html';
+        }
+    });
+
+    // Reorder from dashboard (if items stored)
+    const reorderItems = localStorage.getItem('reorderCart');
+    if (reorderItems) {
+        try {
+            const items = JSON.parse(reorderItems);
+            items.forEach(item => {
+                const existing = cart.find(i => i.id === item.id);
+                if (existing) existing.quantity += item.quantity;
+                else cart.push({ ...item });
+            });
+            localStorage.removeItem('reorderCart');
+            updateCartUI();
+            showToast('🔄 Items added from previous order');
+        } catch(e) {}
+    }
+
+    sortProducts();
+    updateCartUI();
+</script>
 </body>
 </html>
