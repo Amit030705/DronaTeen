@@ -11,11 +11,11 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Security & middleware (CSP disabled for development)
+// Middleware (CSP disabled for development)
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json());
-app.use(express.static('.')); // serve static files (HTML, CSS, JS)
+app.use(express.static('.'));
 
 // Rate limiting
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
@@ -74,7 +74,7 @@ async function sendAdminAlert(action, user, req, extra = {}) {
     if (!adminEmail) return console.warn('⚠️ ADMIN_EMAIL missing');
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const userAgent = req.headers['user-agent'];
-    const html = `<h3>🔔 DronTeen Alert: ${action}</h3><p><strong>User:</strong> ${user.name} (${user.email})</p><p><strong>Time:</strong> ${new Date().toLocaleString()}</p><p><strong>IP:</strong> ${ip}</p><p><strong>Device/Browser:</strong> ${userAgent}</p>${extra.orderAmount ? `<p><strong>Order Amount:</strong> ₹${extra.orderAmount}</p>` : ''}${extra.message ? `<p><strong>Details:</strong> ${extra.message}</p>` : ''}`;
+    const html = `<h3>🔔 DronTeen Alert: ${action}</h3><p><strong>User:</strong> ${user.name} (${user.email})</p><p><strong>Time:</strong> ${new Date().toLocaleString()}</p><p><strong>IP:</strong> ${ip}</p><p><strong>Device:</strong> ${userAgent}</p>${extra.orderAmount ? `<p><strong>Order Amount:</strong> ₹${extra.orderAmount}</p>` : ''}`;
     try {
         await transporter.sendMail({ from: process.env.EMAIL_USER, to: adminEmail, subject: `[DronTeen] ${action}`, html });
         console.log(`📧 Email sent: ${action}`);
@@ -95,14 +95,15 @@ const authMiddleware = async (req, res, next) => {
 // ------------------------ AUTH ROUTES ------------------------
 app.post('/api/auth/register', async (req, res) => {
     try {
-        const { name, email, password } = req.body;
-        if (await User.findOne({ email })) return res.status(400).json({ success: false, message: 'Email exists' });
+        const { name, email, password, address, prefPayment } = req.body;
+        if (await User.findOne({ email }))
+            return res.status(400).json({ success: false, message: 'Email already exists' });
         const hashed = await bcrypt.hash(password, 10);
-        const user = new User({ name, email, password: hashed });
+        const user = new User({ name, email, password: hashed, address, prefPayment });
         await user.save();
         const token = jwt.sign({ userId: user._id, email }, process.env.JWT_SECRET, { expiresIn: '7d' });
         sendAdminAlert('New User Registration', user, req);
-        res.json({ success: true, token, user: { name, email } });
+        res.json({ success: true, token, user: { name, email, address, prefPayment } });
     } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account - DronTeen</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .auth-container { max-width: 500px; margin: 40px auto; }
+        select { width: 100%; padding: 12px; border-radius: 60px; border: 1px solid #e2e8f0; margin-bottom: 16px; background: white; }
+    </style>
+</head>
+<body>
+<div class="auth-container">
+    <div class="logo" style="text-align:center; font-size:32px;"><i class="fas fa-bolt"></i> DronTeen</div>
+    <h2>Create Account</h2>
+    <form id="registerForm">
+        <input type="text" id="fullName" placeholder="Full Name" required>
+        <div class="error-message" id="nameError"></div>
+
+        <input type="email" id="email" placeholder="Email Address" required>
+        <div class="error-message" id="emailError"></div>
+
+        <input type="password" id="password" placeholder="Password (min 6 characters)" required>
+        <div class="error-message" id="passwordError"></div>
+
+        <input type="password" id="confirmPassword" placeholder="Confirm Password" required>
+        <div class="error-message" id="confirmError"></div>
+
+        <input type="text" id="address" placeholder="Delivery Address (optional)" value="Greater Noida, Noida">
+
+        <select id="prefPayment">
+            <option value="UPI">UPI (Google Pay, PhonePe)</option>
+            <option value="Card">Credit/Debit Card</option>
+            <option value="COD">Cash on Delivery</option>
+        </select>
+
+        <button type="submit">Sign Up</button>
+        <div class="error-message" id="registerError" style="text-align:center; margin-top:12px;"></div>
+    </form>
+    <div class="login-link">Already have an account? <a href="login.html">Login</a></div>
+</div>
+<script>
+    const form = document.getElementById('registerForm');
+    const fullName = document.getElementById('fullName');
+    const email = document.getElementById('email');
+    const password = document.getElementById('password');
+    const confirm = document.getElementById('confirmPassword');
+    const address = document.getElementById('address');
+    const prefPayment = document.getElementById('prefPayment');
+    const nameError = document.getElementById('nameError');
+    const emailError = document.getElementById('emailError');
+    const passwordError = document.getElementById('passwordError');
+    const confirmError = document.getElementById('confirmError');
+    const registerError = document.getElementById('registerError');
+
+    function hideErrors() {
+        [nameError, emailError, passwordError, confirmError, registerError].forEach(e => e.style.display = 'none');
+    }
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideErrors();
+        let valid = true;
+        if (!fullName.value.trim()) { nameError.textContent = 'Full name required'; nameError.style.display = 'block'; valid = false; }
+        if (!email.value.trim()) { emailError.textContent = 'Email required'; emailError.style.display = 'block'; valid = false; }
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) { emailError.textContent = 'Invalid email'; emailError.style.display = 'block'; valid = false; }
+        if (!password.value) { passwordError.textContent = 'Password required'; passwordError.style.display = 'block'; valid = false; }
+        else if (password.value.length < 6) { passwordError.textContent = 'Minimum 6 characters'; passwordError.style.display = 'block'; valid = false; }
+        if (password.value !== confirm.value) { confirmError.textContent = 'Passwords do not match'; confirmError.style.display = 'block'; valid = false; }
+        if (!valid) return;
+
+        try {
+            const res = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: fullName.value.trim(),
+                    email: email.value.trim(),
+                    password: password.value,
+                    address: address.value.trim() || 'Greater Noida, Noida',
+                    prefPayment: prefPayment.value
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                localStorage.setItem('droneToken', data.token);
+                localStorage.setItem('userEmail', data.user.email);
+                alert('Account created! Redirecting...');
+                window.location.href = '/dashboard.html';
+            } else {
+                registerError.textContent = data.message || 'Registration failed';
+                registerError.style.display = 'block';
+            }
+        } catch (err) {
+            registerError.textContent = 'Server error. Try again.';
+            registerError.style.display = 'block';
+        }
+    });
+</script>
+</body>
+</html>
