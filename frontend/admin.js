@@ -92,11 +92,27 @@ window.viewStudent = async (id) => {
         document.getElementById('stDetailCanteen').innerText = data.user.canteenId || 'Not Set';
         document.getElementById('stDetailImg').src = data.user.profileImage || 'https://via.placeholder.com/150';
         
-        let ordersHtml = '<table><tr><th>Order ID</th><th>Date</th><th>Amount</th><th>Status</th></tr>';
+        const roleBadge = document.getElementById('stDetailRoleBadge');
+        const roleBtn = document.getElementById('stChangeRoleBtn');
+        roleBadge.innerText = data.user.role.toUpperCase();
+        roleBadge.className = `status-badge ${data.user.role === 'admin' ? 'status-confirmed' : 'status-pending'}`;
+        roleBtn.innerText = data.user.role === 'admin' ? 'Revoke Admin' : 'Make Admin';
+        roleBtn.onclick = async () => {
+            const newRole = data.user.role === 'admin' ? 'user' : 'admin';
+            const ok = await showConfirm('Change Role', `Change ${data.user.name}'s role to ${newRole}?`, 'Confirm Change');
+            if(ok) {
+                await fetchAPI(`/api/admin/users/${data.user._id}`, { method: 'PUT', body: JSON.stringify({ role: newRole }) });
+                showToast('Role updated');
+                viewStudent(data.user._id);
+                loadUsers();
+            }
+        };
+
+        let ordersHtml = '<table><thead><tr><th>Order ID</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead><tbody>';
         data.orders.forEach(o => {
-            ordersHtml += `<tr><td>${o.orderId}</td><td>${new Date(o.createdAt).toLocaleDateString()}</td><td>₹${o.total}</td><td>${o.status}</td></tr>`;
+            ordersHtml += `<tr><td>${o.orderId}</td><td>${new Date(o.createdAt).toLocaleDateString()}</td><td>₹${o.total}</td><td><span class="status-badge status-${o.status}">${o.status}</span></td></tr>`;
         });
-        document.getElementById('stDetailOrders').innerHTML = ordersHtml + '</table>';
+        document.getElementById('stDetailOrders').innerHTML = ordersHtml + '</tbody></table>';
     }
 };
 window.toggleAdmin = async (id, currentRole) => {
