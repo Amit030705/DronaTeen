@@ -444,5 +444,42 @@ async function seedDatabase() {
 }
 // seedDatabase(); // Called inside mongoose.connect
 
+// Chatbot integration (Gemini API)
+app.post('/api/chat', async (req, res) => {
+    try {
+        const { message } = req.body;
+        if (!message) return res.status(400).json({ success: false, message: 'Message is required' });
+
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({ success: false, message: 'Bot API key not configured.' });
+        }
+
+        const fetchParams = {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: `You are DronaTeen Assistant, a helpful and polite customer support bot for a college canteen delivery service called DronaTeen. Keep your answers brief, friendly, and helpful. Student message: ${message}` }] }]
+            })
+        };
+
+        // Use dynamic import for node-fetch if Node < 18, or just rely on global fetch (Node 18+)
+        // Assuming Node 18+ since it's a modern setup
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, fetchParams);
+        const data = await response.json();
+
+        if (data.candidates && data.candidates.length > 0) {
+            const reply = data.candidates[0].content.parts[0].text;
+            res.json({ success: true, reply });
+        } else {
+            console.error("Gemini API Error:", data);
+            res.status(500).json({ success: false, message: 'Bot failed to understand.' });
+        }
+    } catch (err) {
+        console.error("Chat API Exception:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 app.get('/api/health', (req, res) => res.json({ success: true, message: 'Server running' }));
 app.listen(PORT, () => console.log(`🚀 Server on http://localhost:${PORT}`));
