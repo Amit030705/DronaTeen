@@ -163,12 +163,60 @@ window.deleteOrder = async (orderId) => {
 async function loadProducts() {
     const data = await fetchAPI('/api/products');
     if (data.success) {
-        let html = '<table><tr><th>Image</th><th>Name</th><th>Price</th><th>Weight</th><th>Actions</th></tr>';
+        if (data.products.length === 0) {
+            document.getElementById('productsTable').innerHTML = `
+                <div style="text-align: center; padding: 50px; color: #64748b;">
+                    <i class="fas fa-box-open" style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
+                    <p style="font-weight: 600;">No products found</p>
+                    <p style="font-size: 14px;">Add your first menu item using the button above.</p>
+                </div>`;
+            return;
+        }
+        let html = `
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Image</th>
+                            <th>Product Details</th>
+                            <th>Price</th>
+                            <th>Weight</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+        
         data.products.forEach(p => {
-            html += `<tr><td><img src="${p.image}" width="40" height="40"></td><td>${p.name}</td><td>₹${p.price}</td><td>${p.weight}</td>
-            <td><button onclick="editProduct('${p._id}')">Edit</button> <button onclick="deleteProduct('${p._id}')">Delete</button></td></tr>`;
+            html += `
+                <tr>
+                    <td>
+                        <img src="${p.image || 'https://via.placeholder.com/60'}" 
+                             style="width: 50px; height: 50px; border-radius: 12px; object-fit: cover; border: 1px solid #eee;">
+                    </td>
+                    <td>
+                        <div style="font-weight: 700; color: #0f172a;">${p.name}</div>
+                        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">${p.category || 'General'}</div>
+                    </td>
+                    <td>
+                        <div style="font-weight: 800; color: #0c831f;">₹${p.price}</div>
+                    </td>
+                    <td>
+                        <span class="canteen-badge">${p.weight}</span>
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="editProduct('${p._id}')" style="padding: 8px 12px; background: #f1f5f9; color: #475569; box-shadow: none;">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button onclick="deleteProduct('${p._id}')" style="padding: 8px 12px; background: #fee2e2; color: #dc2626; box-shadow: none;">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>`;
         });
-        html += '</table>';
+        
+        html += '</tbody></table></div>';
         document.getElementById('productsTable').innerHTML = html;
     }
 }
@@ -185,6 +233,7 @@ function editProduct(id) {
             document.getElementById('prodWeight').value = prod.weight;
             document.getElementById('prodImage').value = prod.image;
             document.getElementById('prodPopularity').value = prod.popularity;
+            document.getElementById('prodCategory').value = prod.category || 'Lunch';
         }
     });
 }
@@ -204,10 +253,18 @@ document.getElementById('saveProductBtn').onclick = async () => {
     };
     if(currentProductId){
         const res = await fetchAPI(`/api/admin/products/${currentProductId}`, { method: 'PUT', body: JSON.stringify(product) });
-        if(res.success) showToast('Product updated successfully');
+        if(res.success) {
+            showToast('Product updated successfully');
+            document.getElementById('productModal').style.display = 'none';
+            loadProducts();
+        }
     } else {
         const res = await fetchAPI('/api/admin/products', { method: 'POST', body: JSON.stringify(product) });
-        if(res.success) showToast('Product added successfully');
+        if(res.success) {
+            showToast('Product added successfully');
+            document.getElementById('productModal').style.display = 'none';
+            loadProducts();
+        }
     }
     document.getElementById('productModal').style.display = 'none';
     loadProducts();
