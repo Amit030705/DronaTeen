@@ -181,6 +181,7 @@ async function loadProducts() {
                             <th>Product Details</th>
                             <th>Price</th>
                             <th>Weight</th>
+                            <th>Stock</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -202,6 +203,9 @@ async function loadProducts() {
                     </td>
                     <td>
                         <span class="canteen-badge">${p.weight}</span>
+                    </td>
+                    <td>
+                        <div style="font-weight: 700; color: ${p.stock <= 5 ? '#ef4444' : '#1e293b'}">${p.stock || 0}</div>
                     </td>
                     <td>
                         <div style="display: flex; gap: 8px;">
@@ -234,6 +238,7 @@ function editProduct(id) {
             document.getElementById('prodImage').value = prod.image;
             document.getElementById('prodPopularity').value = prod.popularity;
             document.getElementById('prodCategory').value = prod.category || 'Lunch';
+            document.getElementById('prodStock').value = prod.stock || 0;
         }
     });
 }
@@ -249,6 +254,7 @@ document.getElementById('saveProductBtn').onclick = async () => {
         weight: document.getElementById('prodWeight').value,
         image: document.getElementById('prodImage').value,
         popularity: parseInt(document.getElementById('prodPopularity').value) || 0,
+        stock: parseInt(document.getElementById('prodStock').value) || 0,
         category: document.getElementById('prodCategory').value
     };
     if(currentProductId){

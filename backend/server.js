@@ -73,6 +73,7 @@ const productSchema = new mongoose.Schema({
     image: String,
     popularity: { type: Number, default: 0 },
     category: String,
+    stock: { type: Number, default: 20 }, // Added stock field
     inStock: { type: Boolean, default: true },
     createdAt: { type: Date, default: Date.now }
 });
@@ -216,15 +217,39 @@ app.get('/api/user/transactions', authMiddleware, async (req, res) => {
     res.json({ success: true, transactions });
 });
 app.post('/api/orders', authMiddleware, async (req, res) => {
-    const { items, total, paymentMethod, paymentId } = req.body;
-    const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    const orderId = `ORD${Date.now()}${Math.floor(Math.random() * 1000)}`;
-    const order = new Order({ orderId, userId: req.userId, items, total, paymentMethod, paymentId, status: 'confirmed' });
-    await order.save();
-    await new Transaction({ userId: req.userId, orderId, amount: total, type: 'purchase', paymentId }).save();
-    sendAdminAlert('New Order Placed', user, req, { orderAmount: total });
-    res.status(201).json({ success: true, orderId });
+    try {
+        const { items, total, paymentMethod, paymentId } = req.body;
+        const user = await User.findById(req.userId);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+        // 1. Validate Stock
+        for (const item of items) {
+            const product = await Product.findById(item.id);
+            if (!product) return res.status(404).json({ success: false, message: `Product ${item.name} not found` });
+            if (product.stock < item.quantity) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: `Insufficient stock for ${item.name}. Only ${product.stock} pieces left.` 
+                });
+            }
+        }
+
+        // 2. Decrement Stock
+        for (const item of items) {
+            await Product.findByIdAndUpdate(item.id, { $inc: { stock: -item.quantity } });
+        }
+
+        const orderId = `ORD${Date.now()}${Math.floor(Math.random() * 1000)}`;
+        const order = new Order({ orderId, userId: req.userId, items, total, paymentMethod, paymentId, status: 'confirmed' });
+        await order.save();
+        
+        await new Transaction({ userId: req.userId, orderId, amount: total, type: 'purchase', paymentId }).save();
+        sendAdminAlert('New Order Placed', user, req, { orderAmount: total });
+        
+        res.status(201).json({ success: true, orderId });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 // ======================== ADMIN ROUTES ========================
@@ -327,14 +352,14 @@ async function seedDatabase() {
     const productCount = await Product.countDocuments();
     if (productCount < 5) {
         const defaultProducts = [
-            { name: "Chole Bhature", price: 120, weight: "2 Bhature + Chole", image: "https://madhurasrecipe.com/wp-content/uploads/2025/09/MR-Chole-Bhature-featured.jpg", popularity: 8, category: 'Breakfast' },
-            { name: "Samosa", price: 40, weight: "1 piece", image: "https://recipes.timesofindia.com/thumb/61050397.cms?width=1200&height=900", popularity: 10, category: 'Snacks' },
-            { name: "Veg Puff", price: 25, weight: "1 piece", image: "https://www.elloras.in/cdn/shop/products/Mushroom-Puff_693x.jpg?v=1660911957", popularity: 9, category: 'Snacks' },
-            { name: "Hot Coffee", price: 30, weight: "1 cup", image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTa0tizr4Mp3AZDTp-nJLGAp5QQsQhC2u0PNw&s", popularity: 7, category: 'Beverages' },
-            { name: "Chole Kulche", price: 80, weight: "2 kulche + chole", image: "https://media-assets.swiggy.com/swiggy/image/upload/f_auto,q_auto,fl_lossy/pdwsoobxs6wzul1jqljr", popularity: 7, category: 'Lunch' },
-            { name: "Aloo Paratha", price: 60, weight: "2 pieces", image: "https://www.indianhealthyrecipes.com/wp-content/uploads/2020/08/aloo-paratha-recipe-500x500.jpg", popularity: 6, category: 'Breakfast' },
-            { name: "Coca-Cola 1L", price: 20, weight: "1 litre", image: "https://www.coca-cola.com/content/dam/onexp/us/en/brands/coca-cola-spiced/coke-product-category-card.png", popularity: 5, category: 'Beverages' },
-            { name: "Dairy Milk", price: 35, weight: "45g", image: "https://m.media-amazon.com/images/I/718ecxjECuL.jpg", popularity: 6, category: 'Snacks' }
+            { name: "Chole Bhature", price: 120, weight: "2 Bhature + Chole", image: "https://madhurasrecipe.com/wp-content/uploads/2025/09/MR-Chole-Bhature-featured.jpg", popularity: 8, category: 'Breakfast', stock: 15 },
+            { name: "Samosa", price: 40, weight: "1 piece", image: "https://recipes.timesofindia.com/thumb/61050397.cms?width=1200&height=900", popularity: 10, category: 'Snacks', stock: 50 },
+            { name: "Veg Puff", price: 25, weight: "1 piece", image: "https://www.elloras.in/cdn/shop/products/Mushroom-Puff_693x.jpg?v=1660911957", popularity: 9, category: 'Snacks', stock: 30 },
+            { name: "Hot Coffee", price: 30, weight: "1 cup", image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTa0tizr4Mp3AZDTp-nJLGAp5QQsQhC2u0PNw&s", popularity: 7, category: 'Beverages', stock: 100 },
+            { name: "Chole Kulche", price: 80, weight: "2 kulche + chole", image: "https://media-assets.swiggy.com/swiggy/image/upload/f_auto,q_auto,fl_lossy/pdwsoobxs6wzul1jqljr", popularity: 7, category: 'Lunch', stock: 20 },
+            { name: "Aloo Paratha", price: 60, weight: "2 pieces", image: "https://www.indianhealthyrecipes.com/wp-content/uploads/2020/08/aloo-paratha-recipe-500x500.jpg", popularity: 6, category: 'Breakfast', stock: 10 },
+            { name: "Coca-Cola 1L", price: 20, weight: "1 litre", image: "https://www.coca-cola.com/content/dam/onexp/us/en/brands/coca-cola-spiced/coke-product-category-card.png", popularity: 5, category: 'Beverages', stock: 40 },
+            { name: "Dairy Milk", price: 35, weight: "45g", image: "https://m.media-amazon.com/images/I/718ecxjECuL.jpg", popularity: 6, category: 'Snacks', stock: 25 }
         ];
         // Only insert if they don't already exist by name
         for (const p of defaultProducts) {
