@@ -285,6 +285,12 @@
             <span class="close-modal">&times;</span>
         </div>
         <div class="payment-options">
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:12px;margin-bottom:12px;">
+                <div style="font-weight:700;color:#0f172a;">Wallet Balance: <span id="walletBalanceText">Rs 0</span></div>
+                <div style="font-size:12px;color:#64748b;margin-top:4px;">Use wallet partially for this order</div>
+                <input type="number" id="useWalletAmount" min="0" step="1" placeholder="Enter wallet amount to use" style="margin-top:10px; width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:10px;">
+                <div id="walletPayableInfo" style="font-size:12px;color:#334155;margin-top:8px;"></div>
+            </div>
             <label class="payment-option">
                 <input type="radio" name="payment" value="card" checked> <i class="fas fa-credit-card"></i> Credit/Debit Card
             </label>
@@ -491,6 +497,10 @@
     const upiInputDiv = document.getElementById('upiInputDiv');
     const upiIdInput = document.getElementById('upiId');
     const userEmailSpan = document.getElementById('userEmailShort');
+    const walletBalanceText = document.getElementById('walletBalanceText');
+    const useWalletAmountInput = document.getElementById('useWalletAmount');
+    const walletPayableInfo = document.getElementById('walletPayableInfo');
+    let walletBalance = 0;
 
     const userEmail = localStorage.getItem('userEmail') || '';
     if (userEmail) userEmailSpan.innerText = userEmail.split('@')[0];
@@ -502,6 +512,36 @@
         toast.innerText = msg;
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
+    }
+
+    async function loadWalletInfo() {
+        try {
+            const res = await fetch('/api/user/wallet', { headers: { 'Authorization': `Bearer ${token}` } });
+            const data = await res.json();
+            if (data.success) {
+                walletBalance = Number(data.wallet.balance || 0);
+                walletBalanceText.innerText = `Rs ${walletBalance}`;
+                refreshWalletPayableInfo();
+            }
+        } catch (e) {}
+    }
+
+    function getCartTotalWithFees() {
+        const totalValue = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+        return totalValue + 25 + 2;
+    }
+
+    function getWalletUsageApplied() {
+        const requested = Math.max(0, Number(useWalletAmountInput.value || 0));
+        const total = getCartTotalWithFees();
+        return Math.min(requested, walletBalance, total);
+    }
+
+    function refreshWalletPayableInfo() {
+        const total = getCartTotalWithFees();
+        const walletUsed = getWalletUsageApplied();
+        const payable = Math.max(0, total - walletUsed);
+        walletPayableInfo.innerText = `Order Total: Rs ${total} | Wallet Used: Rs ${walletUsed} | Payable: Rs ${payable}`;
     }
 
     // Render products
@@ -629,12 +669,15 @@
     checkoutBtn.addEventListener('click', () => {
         if (cart.length === 0) return;
         paymentModal.style.display = 'flex';
+        loadWalletInfo();
+        refreshWalletPayableInfo();
         document.querySelectorAll('input[name="payment"]').forEach(radio => {
             radio.addEventListener('change', function() {
                 upiInputDiv.style.display = this.value === 'upi' ? 'block' : 'none';
             });
         });
     });
+    useWalletAmountInput.addEventListener('input', refreshWalletPayableInfo);
     closeModal.addEventListener('click', () => paymentModal.style.display = 'none');
     window.addEventListener('click', (e) => { if (e.target === paymentModal) paymentModal.style.display = 'none'; });
 
@@ -642,11 +685,12 @@
     async function saveOrder(paymentId, paymentMethod, upiIdValue = null) {
         const totalValue = cart.reduce((s,i) => s + i.price * i.quantity, 0);
         const finalAmount = totalValue + 25 + 2;
+        const walletUsed = getWalletUsageApplied();
         try {
             const response = await fetch('/api/orders', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ items: cart, total: finalAmount, paymentMethod, paymentId })
+                body: JSON.stringify({ items: cart, total: finalAmount, walletUsed, paymentMethod, paymentId })
             });
             const data = await response.json();
             if (data.success) {
@@ -670,7 +714,17 @@
     // Process payment
     payNowBtn.addEventListener('click', () => {
         const selected = document.querySelector('input[name="payment"]:checked').value;
+        const finalAmount = getCartTotalWithFees();
+        const walletUsed = getWalletUsageApplied();
+        const payableAmount = Math.max(0, finalAmount - walletUsed);
+        if (payableAmount <= 0) {
+            saveOrder('WALLET_ONLY', 'wallet', null);
+            return;
+        }
         if (selected === 'cod') {
+            if (payableAmount > 0) {
+                showToast('COD supports wallet-only adjustment. Remaining amount will be paid on delivery.');
+            }
             saveOrder(null, 'cod', null);
         } else if (selected === 'upi') {
             const upiId = upiIdInput.value.trim();
@@ -682,11 +736,9 @@
             // For simplicity, we'll treat UPI as a direct success (mock payment)
             saveOrder('UPI_' + Date.now(), 'upi', upiId);
         } else if (selected === 'card') {
-            const totalValue = cart.reduce((s,i) => s + i.price * i.quantity, 0);
-            const finalAmount = totalValue + 25 + 2;
             const options = {
                 key: "rzp_test_RP4iA95YzW2bj1",
-                amount: finalAmount * 100,
+                amount: payableAmount * 100,
                 currency: "INR",
                 name: "DronTeen",
                 description: "Grocery Order",

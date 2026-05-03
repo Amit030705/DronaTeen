@@ -38,6 +38,8 @@
                 <div class="stat-card"><div class="stat-title">Pending</div><div class="stat-value" id="pendingOrders">0</div></div>
                 <div class="stat-card"><div class="stat-title">Today Spent</div><div class="stat-value" id="todaySpent">Rs 0</div></div>
                 <div class="stat-card"><div class="stat-title">Vs Yesterday</div><div class="stat-value" id="spendDeltaPercent">0%</div><div id="spendDeltaAmount" style="font-size:0.9rem; margin-top:6px;">Rs 0</div></div>
+                <div class="stat-card"><div class="stat-title">Wallet Balance</div><div class="stat-value" id="walletBalanceCard">Rs 0</div></div>
+                <div class="stat-card"><div class="stat-title">Reward Points</div><div class="stat-value" id="rewardPointsCard">0</div></div>
             </div>
             <div class="two-col">
                 <div class="glass-card">
@@ -313,6 +315,11 @@
                 document.getElementById('spendDeltaPercent').style.color = color;
                 document.getElementById('spendDeltaAmount').innerText = `${sign}Rs ${s.difference}`;
                 document.getElementById('spendDeltaAmount').style.color = color;
+            }
+            const walletRes = await fetchAPI('/api/user/wallet');
+            if (walletRes.success) {
+                document.getElementById('walletBalanceCard').innerText = `Rs ${walletRes.wallet.balance}`;
+                document.getElementById('rewardPointsCard').innerText = `${walletRes.wallet.rewardPoints}`;
             }
             
             const supportRes = await fetchAPI('/api/support');

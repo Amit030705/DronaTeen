@@ -39,6 +39,8 @@ const orderSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     items: [orderItemSchema],
     total: Number,
+    walletUsed: { type: Number, default: 0 },
+    payableAmount: { type: Number, default: 0 },
     paymentMethod: String,
     paymentId: String,
     status: { type: String, enum: ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'cancelled'], default: 'pending' },
@@ -57,6 +59,8 @@ const userSchema = new mongoose.Schema({
     phone: { type: String, default: '' },
     address: { type: String, default: 'Greater Noida, Noida' },
     prefPayment: { type: String, default: 'UPI' },
+    walletBalance: { type: Number, default: 0 },
+    rewardPoints: { type: Number, default: 0 },
     role: { type: String, enum: ['user', 'admin'], default: 'user' },
     lastLogin: Date,
     createdAt: { type: Date, default: Date.now }
@@ -66,7 +70,7 @@ const transactionSchema = new mongoose.Schema({
     orderId: String,
     receiptNumber: String,
     amount: Number,
-    type: { type: String, enum: ['purchase', 'refund'], default: 'purchase' },
+    type: { type: String, enum: ['purchase', 'refund', 'wallet_debit', 'wallet_credit', 'cashback'], default: 'purchase' },
     paymentId: String,
     createdAt: { type: Date, default: Date.now }
 });
@@ -237,6 +241,17 @@ app.get('/api/user/orders', authMiddleware, async (req, res) => {
     const orders = await Order.find({ userId: req.userId }).sort({ createdAt: -1 });
     res.json({ success: true, orders });
 });
+app.get('/api/user/wallet', authMiddleware, async (req, res) => {
+    const user = await User.findById(req.userId).select('walletBalance rewardPoints');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    res.json({
+        success: true,
+        wallet: {
+            balance: Number(user.walletBalance || 0),
+            rewardPoints: Number(user.rewardPoints || 0)
+        }
+    });
+});
 app.get('/api/user/spending/daily', authMiddleware, async (req, res) => {
     try {
         const now = new Date();
@@ -310,12 +325,26 @@ app.put('/api/user/orders/:orderId/cancel', authMiddleware, async (req, res) => 
         order.cancelReason = (reason || '').toString().trim().slice(0, 200);
         await order.save();
 
+        const user = await User.findById(req.userId);
+        if (user) {
+            // Reverse cashback for this order if any was given earlier.
+            const cashbackTxn = await Transaction.findOne({ userId: req.userId, orderId: order.orderId, type: 'cashback' });
+            if (cashbackTxn && cashbackTxn.amount > 0) {
+                user.walletBalance = Math.max(0, Number(user.walletBalance || 0) - Number(cashbackTxn.amount || 0));
+                user.rewardPoints = Math.max(0, Number(user.rewardPoints || 0) - Number(cashbackTxn.amount || 0));
+            }
+
+            // Credit full order amount back to wallet as cancellation refund.
+            user.walletBalance = Number(user.walletBalance || 0) + Number(order.total || 0);
+            await user.save();
+        }
+
         await new Transaction({
             userId: req.userId,
             orderId: order.orderId,
             receiptNumber: makeReceiptNumber(order.orderId),
             amount: order.total,
-            type: 'refund',
+            type: 'wallet_credit',
             paymentId: order.paymentId || ''
         }).save();
 
@@ -353,7 +382,7 @@ app.get('/api/receipts/:receiptNumber/verify', async (req, res) => {
 });
 app.post('/api/orders', authMiddleware, async (req, res) => {
     try {
-        const { items, total, paymentMethod, paymentId } = req.body;
+        const { items, total, paymentMethod, paymentId, walletUsed = 0 } = req.body;
         const user = await User.findById(req.userId);
         if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
@@ -374,18 +403,61 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
             await Product.findByIdAndUpdate(item.id, { $inc: { stock: -item.quantity } });
         }
 
+        const requestedWalletUse = Math.max(0, Number(walletUsed) || 0);
+        const applicableWalletUse = Math.min(requestedWalletUse, Number(user.walletBalance || 0), Number(total || 0));
+        const payableAmount = Math.max(0, Number(total || 0) - applicableWalletUse);
+
         const orderId = `ORD${Date.now()}${Math.floor(Math.random() * 1000)}`;
-        const order = new Order({ orderId, userId: req.userId, items, total, paymentMethod, paymentId, status: 'pending' });
+        const order = new Order({
+            orderId,
+            userId: req.userId,
+            items,
+            total,
+            walletUsed: applicableWalletUse,
+            payableAmount,
+            paymentMethod,
+            paymentId,
+            status: 'pending'
+        });
         await order.save();
-        
+
+        if (applicableWalletUse > 0) {
+            user.walletBalance = Math.max(0, Number(user.walletBalance || 0) - applicableWalletUse);
+            await user.save();
+            await new Transaction({
+                userId: req.userId,
+                orderId,
+                receiptNumber: makeReceiptNumber(orderId),
+                amount: applicableWalletUse,
+                type: 'wallet_debit',
+                paymentId: paymentId || ''
+            }).save();
+        }
+
         await new Transaction({
             userId: req.userId,
             orderId,
             receiptNumber: makeReceiptNumber(orderId),
-            amount: total,
+            amount: payableAmount,
             type: 'purchase',
             paymentId
         }).save();
+
+        // 2% cashback on paid amount (not on wallet-used amount)
+        const cashback = Math.floor(payableAmount * 0.02);
+        if (cashback > 0) {
+            user.walletBalance = Number(user.walletBalance || 0) + cashback;
+            user.rewardPoints = Number(user.rewardPoints || 0) + cashback;
+            await user.save();
+            await new Transaction({
+                userId: req.userId,
+                orderId,
+                receiptNumber: makeReceiptNumber(orderId),
+                amount: cashback,
+                type: 'cashback',
+                paymentId: paymentId || ''
+            }).save();
+        }
         sendAdminAlert('New Order Placed', user, req, { orderAmount: total });
         
         res.status(201).json({ success: true, orderId, _id: order._id });
