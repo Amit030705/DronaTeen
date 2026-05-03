@@ -27,7 +27,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.success) {
                 localStorage.setItem('droneToken', data.token);
                 localStorage.setItem('userEmail', email);
-                window.location.href = '/dashboard.html';
+                
+                // Redirect based on role
+                if (data.user.role === 'admin') {
+                    localStorage.setItem('adminToken', data.token); // Compat with admin.js
+                    window.location.href = '/admin.html';
+                } else {
+                    window.location.href = '/dashboard.html';
+                }
             } else {
                 loginError.textContent = data.message || 'Invalid credentials';
                 loginError.style.display = 'block';

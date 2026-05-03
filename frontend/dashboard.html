@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DronTeen | Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="dashboard-container">
+    <aside class="sidebar">
+        <div class="logo"><i class="fas fa-bolt"></i><span>DronTeen</span></div>
+        <div class="nav-item active" data-tab="overview"><i class="fas fa-chart-line"></i><span>Dashboard</span></div>
+        <div class="nav-item" data-tab="profile"><i class="fas fa-user-graduate"></i><span>Student Profile</span></div>
+        <div class="nav-item" data-tab="orders"><i class="fas fa-shopping-bag"></i><span>My Orders</span></div>
+        <div class="nav-item" data-tab="transactions"><i class="fas fa-exchange-alt"></i><span>Transactions</span></div>
+        <div class="nav-item" data-tab="settings"><i class="fas fa-user-cog"></i><span>Settings</span></div>
+        <div class="nav-item" id="shopNowBtn"><i class="fas fa-store"></i><span>Shop Now</span></div>
+        <div class="nav-item" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Logout</span></div>
+    </aside>
+
+    <main class="main-content">
+        <div class="top-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <h1>Welcome, <span id="userName">—</span></h1>
+            <div class="user-card" style="background: white; padding: 8px 20px; border-radius: 40px;"><i class="fas fa-envelope"></i> <span id="userEmail"></span> <i class="fas fa-power-off logout-icon" id="logoutIcon" style="color:#dc3545; cursor:pointer; margin-left:12px;"></i></div>
+        </div>
+
+        <div id="overviewSection">
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-title">Total Orders</div><div class="stat-value" id="totalOrders">0</div></div>
+                <div class="stat-card"><div class="stat-title">Total Spent (₹)</div><div class="stat-value" id="totalSpent">0</div></div>
+                <div class="stat-card"><div class="stat-title">Completed</div><div class="stat-value" id="completedOrders">0</div></div>
+                <div class="stat-card"><div class="stat-title">Pending</div><div class="stat-value" id="pendingOrders">0</div></div>
+            </div>
+            <div class="two-col">
+                <div class="glass-card">
+                    <div class="section-title">📊 Monthly Spend</div>
+                    <div style="height: 250px; position: relative;">
+                        <canvas id="spendChart"></canvas>
+                    </div>
+                </div>
+                <div class="glass-card"><div class="section-title">🕒 Recent Transactions</div><div id="recentTxns">Loading...</div></div>
+            </div>
+            <div class="glass-card"><div class="section-title">📦 Purchase History</div><div id="purchaseHistory" class="order-history-list">Loading...</div></div>
+        </div>
+
+        <div id="profileSection" style="display:none;">
+            <div class="two-col">
+                <div class="glass-card profile-main-card">
+                    <div class="profile-header-flex">
+                        <div class="profile-image-container">
+                            <img id="profileImg" src="https://via.placeholder.com/150" alt="Student Photo">
+                            <label for="photoUpload" class="photo-edit-btn"><i class="fas fa-camera"></i></label>
+                            <input type="file" id="photoUpload" hidden accept="image/*">
+                        </div>
+                        <div class="profile-id-info">
+                            <h2 id="profileNameDisplay">Student Name</h2>
+                            <span class="canteen-badge">Canteen ID: <span id="canteenIdDisplay">Not Set</span></span>
+                        </div>
+                    </div>
+                    <div class="profile-details-grid">
+                        <div class="detail-item"><label>Roll Number</label><p id="rollDisplay">Not Set</p></div>
+                        <div class="detail-item"><label>Email</label><p id="emailDisplay">user@example.com</p></div>
+                        <div class="detail-item"><label>Address</label><p id="addressDisplay">Greater Noida, Noida</p></div>
+                    </div>
+                </div>
+                <div class="glass-card">
+                    <div class="section-title">📊 Spend Summary</div>
+                    <div class="stat-mini-grid">
+                        <div class="mini-stat"><span>Total Spent</span><h3 id="profileTotalSpent">₹0</h3></div>
+                        <div class="mini-stat"><span>Last Order</span><h3 id="profileLastOrder">None</h3></div>
+                    </div>
+                    <canvas id="profileSpendChart" height="150"></canvas>
+                </div>
+            </div>
+            <div class="glass-card">
+                <div class="section-title">📑 Transaction History</div>
+                <table class="modern-table"><thead><tr><th>Order ID</th><th>Date</th><th>Amount</th><th>Method</th></tr></thead><tbody id="profileTxnTable"></tbody></table>
+            </div>
+        </div>
+
+        <div id="ordersSection" style="display:none;"><div class="glass-card"><div class="section-title">All Orders <input type="text" id="searchOrders" placeholder="Search product..." style="padding:6px 12px; border-radius:20px;"></div><div id="allOrdersList"></div></div></div>
+        <div id="transactionsSection" style="display:none;"><div class="glass-card"><div class="section-title">💰 Transaction Ledger</div><table class="modern-table"><thead><tr><th>Order ID</th><th>Date</th><th>Amount</th><th>Type</th></tr></thead><tbody id="txnTableBody"></tbody></table></div></div>
+        <div id="settingsSection" style="display:none;">
+            <div class="glass-card">
+                <div class="section-title">
+                    <span><i class="fas fa-user-cog" style="color:#0c831f; margin-right:10px;"></i> Account Settings</span>
+                </div>
+                <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 30px; margin-top: -15px;">Update your personal information, contact details, and student identifiers below.</p>
+                
+                <form id="settingsForm" class="settings-form">
+                    <div class="two-col">
+                        <div class="form-group">
+                            <label><i class="fas fa-user"></i> Full Name</label>
+                            <input type="text" id="fullName" required placeholder="Your full name">
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-envelope"></i> Email Address</label>
+                            <input type="email" id="emailSettings" required placeholder="yourname@example.com">
+                        </div>
+                    </div>
+                    
+                    <div class="two-col">
+                        <div class="form-group">
+                            <label><i class="fas fa-id-card"></i> Student Roll Number</label>
+                            <input type="text" id="rollInput" placeholder="e.g. 210056010001">
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-id-badge"></i> Unique Canteen ID</label>
+                            <input type="text" id="canteenIdInput" placeholder="e.g. DT123">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-lock"></i> Change Password</label>
+                        <input type="password" id="newPassword" placeholder="Leave blank to keep current password">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-map-marker-alt"></i> Delivery Address</label>
+                        <input type="text" id="addressInput" placeholder="Your hostel or local address">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-wallet"></i> Preferred Payment Method</label>
+                        <input type="text" id="prefPaymentInput" placeholder="e.g. UPI, Cash, Card">
+                    </div>
+                    
+                    <button type="submit" class="save-btn">
+                        <i class="fas fa-save"></i> Save Changes & Update Profile
+                    </button>
+                </form>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Logout Modal -->
+<div id="logoutModal" class="account-modal">
+    <div class="user-avatar" id="modalAvatar">U</div>
+    <div id="modalProfileImgContainer" style="display:none; margin: 0 auto 16px;">
+        <img id="modalProfileImg" src="" style="width:64px; height:64px; border-radius:50%; object-fit:cover;">
+    </div>
+    <h3 id="modalUserName">User Name</h3>
+    <p id="modalUserEmail">user@example.com</p>
+    <div class="logout-actions">
+        <button class="btn-signout" id="confirmLogout">Sign out</button>
+        <button class="btn-cancel-logout" id="cancelLogout">Cancel</button>
+    </div>
+</div>
+<script>
+    const API_BASE = '';
+    let token = localStorage.getItem('droneToken');
+    if (!token) window.location.href = '/login.html';
+    let chartInstance = null;
+
+    function showToast(msg, isError = false) {
+        let toast = document.createElement('div');
+        toast.className = 'toast-msg';
+        toast.style.borderLeft = isError ? '4px solid #ef4444' : '4px solid #10b981';
+        toast.innerHTML = (isError ? '<i class="fas fa-exclamation-circle"></i> ' : '<i class="fas fa-check-circle"></i> ') + msg;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(20px)';
+            toast.style.transition = '0.3s';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    async function fetchAPI(endpoint, options = {}) {
+        const res = await fetch(endpoint, {
+            ...options,
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, ...options.headers }
+        });
+        if (res.status === 401) { localStorage.removeItem('droneToken'); window.location.href = '/login.html'; throw new Error('Unauth'); }
+        return res.json();
+    }
+
+    // Unified function to refresh all user-related UI
+    async function refreshUserData() {
+        try {
+            const profileRes = await fetchAPI('/api/user/profile');
+            if (profileRes.success) {
+                const u = profileRes.user;
+                // Update Top Bar
+                document.getElementById('userName').innerText = u.name || u.email.split('@')[0];
+                document.getElementById('userEmail').innerText = u.email;
+                
+                // Update Settings Form
+                document.getElementById('fullName').value = u.name || '';
+                document.getElementById('emailSettings').value = u.email;
+                document.getElementById('addressInput').value = u.address || 'Greater Noida, Noida';
+                document.getElementById('prefPaymentInput').value = u.prefPayment || 'UPI';
+                document.getElementById('rollInput').value = u.rollNumber || '';
+                document.getElementById('canteenIdInput').value = u.canteenId || '';
+
+                // Disable if already set
+                if (u.rollNumber && u.rollNumber !== 'Not Set') {
+                    document.getElementById('rollInput').disabled = true;
+                    document.getElementById('rollInput').title = "Roll Number cannot be changed once set.";
+                }
+                if (u.canteenId) {
+                    document.getElementById('canteenIdInput').disabled = true;
+                    document.getElementById('canteenIdInput').title = "Canteen ID cannot be changed once set.";
+                }
+
+                // Update Profile Tab
+                document.getElementById('profileNameDisplay').innerText = u.name;
+                document.getElementById('canteenIdDisplay').innerText = u.canteenId || 'Not Set';
+                document.getElementById('rollDisplay').innerText = u.rollNumber || 'Not Set';
+                document.getElementById('emailDisplay').innerText = u.email;
+                document.getElementById('addressDisplay').innerText = u.address || 'Not Set';
+                if (u.profileImage) document.getElementById('profileImg').src = u.profileImage;
+            }
+
+            const ordersRes = await fetchAPI('/api/user/orders');
+            if (ordersRes.success) {
+                const orders = ordersRes.orders;
+                // Update Stats
+                document.getElementById('totalOrders').innerText = orders.length;
+                const totalSpent = orders.reduce((s,o)=>s+(o.total||0),0);
+                document.getElementById('totalSpent').innerText = '₹' + totalSpent;
+                document.getElementById('completedOrders').innerText = orders.filter(o=>o.status==='confirmed').length;
+                document.getElementById('pendingOrders').innerText = orders.filter(o=>o.status==='pending').length;
+
+                // Update Profile Stats
+                document.getElementById('profileTotalSpent').innerText = '₹' + totalSpent;
+                document.getElementById('profileLastOrder').innerText = orders.length > 0 ? new Date(orders[0].createdAt).toLocaleDateString() : 'None';
+                
+                // Update History Lists
+                renderPurchaseHistory(orders);
+                renderProfileTransactions(orders);
+                renderMonthlyChart(orders);
+            }
+        } catch (e) { console.error('Refresh Error:', e); }
+    }
+
+    function renderPurchaseHistory(orders) {
+        let historyHtml = '';
+        orders.slice(0, 10).forEach(o => {
+            let itemsList = o.items.map(i => `${i.name} x${i.quantity}`).join(', ');
+            historyHtml += `
+                <div class="history-item">
+                    <div class="order-info-main">
+                        <span class="order-id">📦 ${o.orderId}</span>
+                        <span class="order-date">${new Date(o.createdAt).toLocaleString()}</span>
+                        <span class="order-items">${itemsList}</span>
+                    </div>
+                    <div class="order-right">
+                        <span class="order-price">₹${o.total}</span>
+                        <button class="reorder-btn" data-items='${JSON.stringify(o.items)}'>Reorder</button>
+                    </div>
+                </div>`;
+        });
+        document.getElementById('purchaseHistory').innerHTML = historyHtml || '<p>No orders yet</p>';
+        document.querySelectorAll('.reorder-btn').forEach(btn => btn.addEventListener('click', () => { localStorage.setItem('reorderCart', btn.getAttribute('data-items')); window.location.href = '/index.html'; }));
+        
+        let txnHtml = '<table class="modern-table"><thead><tr><th>Order ID</th><th>Date</th><th>Amount</th></tr></thead><tbody>';
+        orders.slice(0,5).forEach(o => txnHtml += `<tr><td><strong>${o.orderId}</strong></td><td>${new Date(o.createdAt).toLocaleDateString()}</td><td>₹${o.total}</td></tr>`);
+        document.getElementById('recentTxns').innerHTML = txnHtml + '</tbody></table>';
+    }
+
+    function renderProfileTransactions(orders) {
+        let tbody = '';
+        orders.slice(0, 10).forEach(o => tbody += `<tr><td>${o.orderId}</td><td>${new Date(o.createdAt).toLocaleDateString()}</td><td>₹${o.total}</td><td>${o.paymentMethod}</td></tr>`);
+        document.getElementById('profileTxnTable').innerHTML = tbody || '<tr><td colspan="4">No transactions</td></tr>';
+    }
+
+    function renderMonthlyChart(orders) {
+        const monthMap = new Map();
+        orders.forEach(o => { let m = new Date(o.createdAt).toLocaleString('default', { month: 'short' }); monthMap.set(m, (monthMap.get(m)||0)+(o.total||0)); });
+        const labels = [...monthMap.keys()].slice(-6), data = labels.map(l=>monthMap.get(l));
+        if (chartInstance) chartInstance.destroy();
+        const ctx = document.getElementById('spendChart').getContext('2d');
+        if(!ctx) return;
+        chartInstance = new Chart(ctx, { 
+            type: 'line', 
+            data: { 
+                labels, 
+                datasets: [{ label: 'Spending (₹)', data, borderColor: '#0c831f', fill: true, backgroundColor: 'rgba(12,131,31,0.08)', tension: 0.4, borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#fff', pointBorderColor: '#0c831f', pointBorderWidth: 2 }] 
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f3f4f6' }, border: { display: false }, ticks: { color: '#9ca3af', font: { size: 11 } } }, x: { grid: { display: false }, border: { display: false }, ticks: { color: '#9ca3af', font: { size: 11 } } } } }
+        });
+    }
+
+    async function loadDashboard() {
+        await refreshUserData();
+        const txnRes = await fetchAPI('/api/user/transactions');
+        if (txnRes.success) {
+            let tbody = '';
+            txnRes.transactions.forEach(t => tbody += `<tr><td>${t.orderId}</td><td>${new Date(t.createdAt).toLocaleDateString()}</td><td>₹${t.amount}</td><td>${t.type}</td></tr>`);
+            document.getElementById('txnTableBody').innerHTML = tbody || '<tr><td colspan="4">No transactions</td></tr>';
+        }
+    }
+    function renderFullOrders(orders) {
+        const container = document.getElementById('allOrdersList');
+        if(!container) return;
+        container.innerHTML = orders.map(o => `
+            <div class="history-item">
+                <div class="order-info-main">
+                    <span class="order-id">📦 ${o.orderId}</span>
+                    <span class="order-date">${new Date(o.createdAt).toLocaleString()}</span>
+                    <span class="order-items">${o.items.map(i=>`${i.name} x${i.quantity}`).join(', ')}</span>
+                </div>
+                <div class="order-right">
+                    <span class="order-price">₹${o.total}</span>
+                    <span class="status-badge ${o.status}">${o.status}</span>
+                </div>
+            </div>`).join('');
+    }
+    document.getElementById('searchOrders')?.addEventListener('input', async (e) => {
+        const term = e.target.value.toLowerCase();
+        const res = await fetchAPI('/api/user/orders');
+        if (res.success) renderFullOrders(res.orders.filter(o => o.items.some(i => i.name.toLowerCase().includes(term))));
+    });
+    document.getElementById('settingsForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = { 
+            name: document.getElementById('fullName').value, 
+            email: document.getElementById('emailSettings').value, 
+            address: document.getElementById('addressInput').value, 
+            prefPayment: document.getElementById('prefPaymentInput').value,
+            rollNumber: document.getElementById('rollInput').value,
+            canteenId: document.getElementById('canteenIdInput').value
+        };
+        const pwd = document.getElementById('newPassword').value;
+        if (pwd.trim()) payload.password = pwd;
+        const res = await fetchAPI('/api/user/profile', { method: 'PUT', body: JSON.stringify(payload) });
+        if(res.success) { 
+            showToast('Profile updated successfully!'); 
+            refreshUserData(); 
+        } else {
+            showToast('Update failed: ' + res.message, true);
+        }
+    });
+    const tabs = document.querySelectorAll('.nav-item[data-tab]');
+    const sections = { overview: 'overviewSection', profile: 'profileSection', orders: 'ordersSection', transactions: 'transactionsSection', settings: 'settingsSection' };
+    tabs.forEach(tab => tab.addEventListener('click', () => { 
+        Object.values(sections).forEach(sec => document.getElementById(sec).style.display = 'none'); 
+        const target = tab.getAttribute('data-tab');
+        document.getElementById(sections[target]).style.display = 'block'; 
+        tabs.forEach(t=>t.classList.remove('active')); 
+        tab.classList.add('active'); 
+        if (target === 'profile' || target === 'overview') refreshUserData();
+    }));
+
+    document.getElementById('photoUpload').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async function(event) {
+            const base64 = event.target.result;
+            document.getElementById('profileImg').src = base64;
+            await fetchAPI('/api/user/profile', { method: 'PUT', body: JSON.stringify({ profileImage: base64 }) });
+            refreshUserData();
+        };
+        reader.readAsDataURL(file);
+    });
+    document.getElementById('shopNowBtn')?.addEventListener('click', () => window.location.href = '/index.html');
+    
+    // Custom Logout Modal Logic
+    const logoutModal = document.getElementById('logoutModal');
+    function showLogoutModal() {
+        const email = document.getElementById('userEmail').innerText;
+        const name = document.getElementById('userName').innerText;
+        document.getElementById('modalUserEmail').innerText = email;
+        document.getElementById('modalUserName').innerText = name;
+
+        const profileImg = document.getElementById('profileImg');
+        if (profileImg && profileImg.src && !profileImg.src.includes('placeholder')) {
+            document.getElementById('modalAvatar').style.display = 'none';
+            document.getElementById('modalProfileImgContainer').style.display = 'block';
+            document.getElementById('modalProfileImg').src = profileImg.src;
+        } else {
+            document.getElementById('modalAvatar').style.display = 'flex';
+            document.getElementById('modalProfileImgContainer').style.display = 'none';
+            document.getElementById('modalAvatar').innerText = (name || email)[0].toUpperCase();
+        }
+        logoutModal.style.display = 'block';
+    }
+    function hideLogoutModal() { logoutModal.style.display = 'none'; }
+    function performLogout() { localStorage.removeItem('droneToken'); window.location.href = '/login.html'; }
+
+    document.getElementById('logoutBtn')?.addEventListener('click', showLogoutModal);
+    document.getElementById('logoutIcon')?.addEventListener('click', showLogoutModal);
+    document.getElementById('confirmLogout')?.addEventListener('click', performLogout);
+    document.getElementById('cancelLogout')?.addEventListener('click', hideLogoutModal);
+    window.addEventListener('click', (e) => { if (e.target !== logoutModal && !logoutModal.contains(e.target) && e.target.id !== 'logoutBtn' && e.target.id !== 'logoutIcon') hideLogoutModal(); });
+
+    loadDashboard();
+</script>
+</body>
+</html>

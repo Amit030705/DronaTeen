@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - DronTeen</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .auth-container { max-width: 400px; margin: 100px auto; background: white; border-radius: 32px; padding: 40px; box-shadow: 0 20px 35px rgba(0,0,0,0.1); }
+        .logo { text-align: center; font-size: 32px; color: #0c831f; margin-bottom: 20px; }
+        input { width: 100%; padding: 12px; margin-bottom: 16px; border-radius: 60px; border: 1px solid #ddd; }
+        button { width: 100%; background: #0c831f; color: white; padding: 12px; border-radius: 60px; border: none; font-weight: bold; cursor: pointer; }
+        .error { color: #dc3545; text-align: center; margin-top: 12px; display: none; }
+    </style>
+</head>
+<body>
+<div class="auth-container">
+    <div class="logo"><i class="fas fa-shield-alt"></i> Admin Panel</div>
+    <h2 style="text-align:center; margin-bottom:24px;">Login</h2>
+    <form id="adminLoginForm">
+        <input type="email" id="email" placeholder="Admin Email" required>
+        <input type="password" id="password" placeholder="Password" required>
+        <button type="submit">Login as Admin</button>
+        <div id="loginError" class="error"></div>
+    </form>
+</div>
+<script>
+    document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const errorDiv = document.getElementById('loginError');
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            if (data.success && data.user.role === 'admin') {
+                localStorage.setItem('adminToken', data.token);
+                localStorage.setItem('adminEmail', email);
+                window.location.href = '/admin.html';
+            } else {
+                errorDiv.textContent = 'Admin access only. Invalid credentials.';
+                errorDiv.style.display = 'block';
+            }
+        } catch (err) {
+            errorDiv.textContent = 'Server error';
+            errorDiv.style.display = 'block';
+        }
+    });
+</script>
+</body>
+</html>

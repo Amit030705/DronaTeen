@@ -62,13 +62,16 @@ Built to reduce long queues, improve order management, and create a seamless can
 
 ```bash
 DronaTeen/
-│── server.js
-│── package.json
-│── .env
-│── public/
+├── backend/            # Node.js Express server & API
+│   ├── server.js
+│   ├── package.json
+│   ├── .env
+│   └── node_modules/
+├── frontend/           # Static frontend files (HTML/CSS/JS)
 │   ├── index.html
 │   ├── style.css
 │   └── script.js
+└── README.md
 ```
 
 ---
@@ -82,19 +85,23 @@ git clone https://github.com/Amit030705/DronaTeen.git
 cd DronaTeen
 ```
 
-### 2️⃣ Install Dependencies
+### 2️⃣ Install Backend Dependencies
 
 ```bash
+cd backend
 npm install
 ```
 
-### 3️⃣ Create `.env`
+### 3️⃣ Setup Environment Variables
+Create a `.env` file inside the `backend` directory:
 
 ```env
 PORT=3000
 MONGODB_URI=your_mongodb_connection_string
-RAZORPAY_KEY_ID=your_key_id
-RAZORPAY_KEY_SECRET=your_secret_key
+JWT_SECRET=your_jwt_secret
+EMAIL_USER=your_email
+EMAIL_PASS=your_email_password
+ADMIN_EMAIL=admin_email
 ```
 
 ### 4️⃣ Run Project

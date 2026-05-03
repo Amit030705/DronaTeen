@@ -1,0 +1,215 @@
+let token = localStorage.getItem('adminToken');
+if (!token) window.location.href = '/admin-login.html';
+
+let currentProductId = null;
+
+async function fetchAPI(endpoint, options = {}) {
+    const res = await fetch(endpoint, {
+        ...options,
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, ...options.headers }
+    });
+    if (res.status === 401) { localStorage.removeItem('adminToken'); window.location.href = '/admin-login.html'; }
+    return res.json();
+}
+
+function showToast(msg, isError = false) {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.style.background = isError ? '#ef4444' : '#1e293b';
+    toast.innerHTML = `<i class="fas ${isError ? 'fa-exclamation-circle' : 'fa-check-circle'}"></i> ${msg}`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function showConfirm(title, text, okText = 'Delete') {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirmModal');
+        document.getElementById('confirmTitle').innerText = title;
+        document.getElementById('confirmText').innerText = text;
+        const okBtn = document.getElementById('okConfirmBtn');
+        okBtn.innerText = okText;
+        modal.style.display = 'flex';
+        
+        const cleanup = (res) => {
+            modal.style.display = 'none';
+            okBtn.onclick = null;
+            document.getElementById('cancelConfirmBtn').onclick = null;
+            resolve(res);
+        };
+        
+        okBtn.onclick = () => cleanup(true);
+        document.getElementById('cancelConfirmBtn').onclick = () => cleanup(false);
+    });
+}
+
+// Load dashboard stats
+async function loadDashboard() {
+    const data = await fetchAPI('/api/admin/stats');
+    if (data.success) {
+        const stats = data.stats;
+        document.getElementById('statsGrid').innerHTML = `
+            <div class="stat-card"><div class="stat-title">Total Users</div><div class="stat-value">${stats.totalUsers}</div></div>
+            <div class="stat-card"><div class="stat-title">Total Orders</div><div class="stat-value">${stats.totalOrders}</div></div>
+            <div class="stat-card"><div class="stat-title">Revenue (₹)</div><div class="stat-value">₹${stats.totalRevenue}</div></div>
+            <div class="stat-card"><div class="stat-title">Products</div><div class="stat-value">${stats.totalProducts}</div></div>
+        `;
+        let ordersHtml = '<table><tr><th>Order ID</th><th>User</th><th>Total</th><th>Status</th><th>Date</th></tr>';
+        data.recentOrders.forEach(o => {
+            ordersHtml += `<tr><td>${o.orderId}</td><td>${o.userId?.name || 'N/A'}</td><td>₹${o.total}</td><td><span class="status-badge status-${o.status}">${o.status}</span></td><td>${new Date(o.createdAt).toLocaleDateString()}</td></tr>`;
+        });
+        ordersHtml += ';</table>';
+        document.getElementById('recentOrdersTable').innerHTML = ordersHtml;
+        // Chart
+        const revenueData = data.recentOrders.map(o => o.total);
+        new Chart(document.getElementById('revenueChart'), { type: 'line', data: { labels: data.recentOrders.map(o => o.orderId), datasets: [{ label: 'Order Amount', data: revenueData, borderColor: '#0c831f' }] } });
+    }
+}
+
+// Users
+async function loadUsers() {
+    const data = await fetchAPI('/api/admin/users');
+    if (data.success) {
+        let html = '<table><thead><tr><th>Name</th><th>Email</th><th>Canteen ID</th><th>Roll No</th><th>Role</th><th>Actions</th></tr></thead><tbody>';
+        data.users.forEach(u => {
+            html += `<tr><td>${u.name}</td><td>${u.email}</td><td><span class="canteen-badge">${u.canteenId || '-'}</span></td><td>${u.rollNumber || '-'}</td><td>${u.role}</td>
+            <td>
+                <button onclick="viewStudent('${u._id}')" title="View Profile"><i class="fas fa-eye"></i></button>
+                <button onclick="toggleAdmin('${u._id}', '${u.role}')" title="Change Role"><i class="fas fa-user-shield"></i></button> 
+                <button onclick="deleteUser('${u._id}')" title="Remove Student" style="background:#ef4444;"><i class="fas fa-trash"></i></button>
+            </td></tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('usersTable').innerHTML = html;
+    }
+}
+window.viewStudent = async (id) => {
+    const data = await fetchAPI(`/api/admin/users/${id}`);
+    if (data.success) {
+        document.getElementById('studentModal').style.display = 'flex';
+        document.getElementById('stDetailName').innerText = data.user.name;
+        document.getElementById('stDetailEmail').innerText = data.user.email;
+        document.getElementById('stDetailRoll').innerText = data.user.rollNumber || 'Not Set';
+        document.getElementById('stDetailCanteen').innerText = data.user.canteenId || 'Not Set';
+        document.getElementById('stDetailImg').src = data.user.profileImage || 'https://via.placeholder.com/150';
+        
+        let ordersHtml = '<table><tr><th>Order ID</th><th>Date</th><th>Amount</th><th>Status</th></tr>';
+        data.orders.forEach(o => {
+            ordersHtml += `<tr><td>${o.orderId}</td><td>${new Date(o.createdAt).toLocaleDateString()}</td><td>₹${o.total}</td><td>${o.status}</td></tr>`;
+        });
+        document.getElementById('stDetailOrders').innerHTML = ordersHtml + '</table>';
+    }
+};
+window.toggleAdmin = async (id, currentRole) => {
+    const newRole = currentRole === 'admin' ? 'user' : 'admin';
+    await fetchAPI(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify({ role: newRole }) });
+    loadUsers();
+};
+window.deleteUser = async (id) => { 
+    const ok = await showConfirm('Remove Student', 'Are you sure you want to remove this student? This will permanently delete their account and history.', 'Remove Permanently');
+    if(ok){ 
+        const res = await fetchAPI(`/api/admin/users/${id}`, { method: 'DELETE' }); 
+        if(res.success) {
+            showToast('Student removed successfully');
+            loadUsers(); 
+        }
+    } 
+};
+
+// Orders
+async function loadOrders() {
+    const data = await fetchAPI('/api/admin/orders');
+    if (data.success) {
+        let html = '<table><tr><th>Order ID</th><th>User</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th><th>Actions</th></tr>';
+        data.orders.forEach(o => {
+            let items = o.items.map(i => `${i.name} x${i.quantity}`).join(', ');
+            html += `<tr><td>${o.orderId}</td><td>${o.userId?.name || 'N/A'}</td><td>${items}</td><td>₹${o.total}</td>
+            <td><select id="status-${o.orderId}" onchange="updateStatus('${o.orderId}', this.value)"><option ${o.status==='pending'?'selected':''}>pending</option><option ${o.status==='confirmed'?'selected':''}>confirmed</option><option ${o.status==='delivered'?'selected':''}>delivered</option></select></td>
+            <td>${new Date(o.createdAt).toLocaleDateString()}</td>
+            <td><button onclick="deleteOrder('${o.orderId}')">Delete</button></td></tr>`;
+        });
+        html += '</table>';
+        document.getElementById('ordersTable').innerHTML = html;
+    }
+}
+window.updateStatus = async (orderId, status) => {
+    await fetchAPI(`/api/admin/orders/${orderId}`, { method: 'PUT', body: JSON.stringify({ status }) });
+    loadOrders();
+};
+window.deleteOrder = async (orderId) => {
+    const ok = await showConfirm('Cancel Order', `Delete order ${orderId}? This cannot be undone.`, 'Delete Order');
+    if(ok){ await fetchAPI(`/api/admin/orders/${orderId}`, { method: 'DELETE' }); loadOrders(); showToast('Order deleted'); }
+};
+
+// Products
+async function loadProducts() {
+    const data = await fetchAPI('/api/products');
+    if (data.success) {
+        let html = '<table><tr><th>Image</th><th>Name</th><th>Price</th><th>Weight</th><th>Actions</th></tr>';
+        data.products.forEach(p => {
+            html += `<tr><td><img src="${p.image}" width="40" height="40"></td><td>${p.name}</td><td>₹${p.price}</td><td>${p.weight}</td>
+            <td><button onclick="editProduct('${p._id}')">Edit</button> <button onclick="deleteProduct('${p._id}')">Delete</button></td></tr>`;
+        });
+        html += '</table>';
+        document.getElementById('productsTable').innerHTML = html;
+    }
+}
+function editProduct(id) { 
+    currentProductId = id;
+    document.getElementById('modalTitle').innerText = 'Edit Product';
+    document.getElementById('productModal').style.display = 'flex';
+    // fetch product details
+    fetchAPI('/api/products').then(data => {
+        const prod = data.products.find(p => p._id === id);
+        if(prod){
+            document.getElementById('prodName').value = prod.name;
+            document.getElementById('prodPrice').value = prod.price;
+            document.getElementById('prodWeight').value = prod.weight;
+            document.getElementById('prodImage').value = prod.image;
+            document.getElementById('prodPopularity').value = prod.popularity;
+        }
+    });
+}
+window.deleteProduct = async (id) => { 
+    const ok = await showConfirm('Delete Product', 'Remove this item from the menu?', 'Delete Item');
+    if(ok){ await fetchAPI(`/api/admin/products/${id}`, { method: 'DELETE' }); loadProducts(); showToast('Product removed'); } 
+};
+document.getElementById('addProductBtn').onclick = () => { currentProductId = null; document.getElementById('modalTitle').innerText = 'Add Product'; document.getElementById('productModal').style.display = 'flex'; };
+document.getElementById('saveProductBtn').onclick = async () => {
+    const product = {
+        name: document.getElementById('prodName').value,
+        price: parseInt(document.getElementById('prodPrice').value),
+        weight: document.getElementById('prodWeight').value,
+        image: document.getElementById('prodImage').value,
+        popularity: parseInt(document.getElementById('prodPopularity').value) || 0,
+        category: document.getElementById('prodCategory').value
+    };
+    if(currentProductId){
+        const res = await fetchAPI(`/api/admin/products/${currentProductId}`, { method: 'PUT', body: JSON.stringify(product) });
+        if(res.success) showToast('Product updated successfully');
+    } else {
+        const res = await fetchAPI('/api/admin/products', { method: 'POST', body: JSON.stringify(product) });
+        if(res.success) showToast('Product added successfully');
+    }
+    document.getElementById('productModal').style.display = 'none';
+    loadProducts();
+};
+document.querySelectorAll('.close').forEach(btn => btn.onclick = () => document.getElementById('productModal').style.display = 'none');
+
+// Tab navigation
+document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+    item.addEventListener('click', () => {
+        document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+        item.classList.add('active');
+        const section = item.dataset.section;
+        document.getElementById('dashboardSection').style.display = section === 'dashboard' ? 'block' : 'none';
+        document.getElementById('usersSection').style.display = section === 'users' ? 'block' : 'none';
+        document.getElementById('ordersSection').style.display = section === 'orders' ? 'block' : 'none';
+        document.getElementById('productsSection').style.display = section === 'products' ? 'block' : 'none';
+        if(section === 'users') loadUsers();
+        if(section === 'orders') loadOrders();
+        if(section === 'products') loadProducts();
+        if(section === 'dashboard') loadDashboard();
+    });
+});
+document.getElementById('logoutAdmin').addEventListener('click', () => { localStorage.removeItem('adminToken'); window.location.href = '/admin-login.html'; });
+loadDashboard();

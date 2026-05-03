@@ -82,6 +82,65 @@
         .toast-msg { position: fixed; bottom: 25px; right: 25px; background: #1e293b; color: white; padding: 12px 24px; border-radius: 60px; z-index: 1000; animation: fadeup 0.3s ease; }
         @keyframes fadeup { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
         @media (max-width: 1024px) { .main-container { flex-direction: column; } .cart-sidebar { position: static; margin-top: 24px; } }
+
+        /* Account/Logout Modal (Google Style) */
+        .account-modal {
+            display: none;
+            position: fixed;
+            top: 80px;
+            right: 40px;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.12);
+            padding: 24px;
+            width: 320px;
+            z-index: 2000;
+            border: 1px solid #f0f0f0;
+            text-align: center;
+            animation: slideDown 0.3s ease;
+        }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .account-modal .user-avatar {
+            width: 64px;
+            height: 64px;
+            background: #e8f5e9;
+            color: #0c831f;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin: 0 auto 16px;
+            font-weight: 700;
+        }
+        .account-modal h3 { font-size: 1.1rem; color: #1f2937; margin-bottom: 4px; }
+        .account-modal p { font-size: 0.9rem; color: #6b7280; margin-bottom: 24px; }
+
+        .logout-actions { display: flex; flex-direction: column; gap: 12px; }
+        .btn-signout {
+            background: #fdf2f2;
+            color: #dc2626;
+            border: 1px solid #fee2e2;
+            padding: 12px;
+            border-radius: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            text-decoration: none;
+        }
+        .btn-signout:hover { background: #fee2e2; }
+        .btn-cancel-logout {
+            background: #f9fafb;
+            color: #4b5563;
+            border: 1px solid #e5e7eb;
+            padding: 12px;
+            border-radius: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-cancel-logout:hover { background: #f3f4f6; }
     </style>
 </head>
 <body>
@@ -135,6 +194,21 @@
             <button class="checkout-btn" id="checkoutBtn">Proceed to Checkout</button>
         </div>
     </aside>
+</div>
+
+<!-- Logout Modal -->
+<div id="logoutModal" class="account-modal">
+    <div class="user-avatar" id="modalAvatar">U</div>
+    <div id="modalProfileImgContainer" style="display:none; margin: 0 auto 16px;">
+        <img id="modalProfileImg" src="" style="width:64px; height:64px; border-radius:50%; object-fit:cover;">
+    </div>
+    <h3 id="modalUserName">User Name</h3>
+    <p id="modalUserEmail">user@example.com</p>
+    <div class="logout-actions">
+        <button class="btn-signout" id="confirmLogout">Sign out</button>
+        <button class="btn-cancel-logout" id="cancelLogout">Cancel</button>
+        <a href="/dashboard.html" class="btn-cancel-logout" style="text-decoration:none;">Go to Dashboard</a>
+    </div>
 </div>
 
 <!-- Payment Modal -->
@@ -365,12 +439,39 @@
         }
     });
 
-    // Logout
-    document.getElementById('userMenuBtn').addEventListener('click', () => {
-        if (confirm('Logout?')) {
-            localStorage.removeItem('droneToken');
-            localStorage.removeItem('userEmail');
-            window.location.href = '/login.html';
+    userMenuBtn.addEventListener('click', async () => {
+        const res = await fetch('/api/user/profile', { headers: { 'Authorization': `Bearer ${localStorage.getItem('droneToken')}` } });
+        const data = await res.json();
+        const u = data.user || { email: 'User', name: 'User' };
+        
+        document.getElementById('modalUserEmail').innerText = u.email;
+        document.getElementById('modalUserName').innerText = u.name || u.email.split('@')[0];
+        
+        if (u.profileImage) {
+            document.getElementById('modalAvatar').style.display = 'none';
+            document.getElementById('modalProfileImgContainer').style.display = 'block';
+            document.getElementById('modalProfileImg').src = u.profileImage;
+        } else {
+            document.getElementById('modalAvatar').style.display = 'flex';
+            document.getElementById('modalProfileImgContainer').style.display = 'none';
+            document.getElementById('modalAvatar').innerText = (u.name || u.email)[0].toUpperCase();
+        }
+        logoutModal.style.display = 'block';
+    });
+
+    document.getElementById('confirmLogout').addEventListener('click', () => {
+        localStorage.removeItem('droneToken');
+        localStorage.removeItem('userEmail');
+        window.location.href = '/login.html';
+    });
+
+    document.getElementById('cancelLogout').addEventListener('click', () => {
+        logoutModal.style.display = 'none';
+    });
+
+    window.addEventListener('click', (e) => {
+        if (e.target !== logoutModal && !logoutModal.contains(e.target) && !userMenuBtn.contains(e.target)) {
+            logoutModal.style.display = 'none';
         }
     });
 
