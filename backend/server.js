@@ -235,6 +235,14 @@ app.put('/api/admin/users/:id', adminMiddleware, async (req, res) => {
     const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true }).select('-password');
     res.json({ success: true, user });
 });
+// Get single user details with orders
+app.get('/api/admin/users/:id', adminMiddleware, async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id).select('-password');
+        const orders = await Order.find({ userId: req.params.id }).sort({ createdAt: -1 });
+        res.json({ success: true, user, orders });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
 // Delete user
 app.delete('/api/admin/users/:id', adminMiddleware, async (req, res) => {
     await User.findByIdAndDelete(req.params.id);
