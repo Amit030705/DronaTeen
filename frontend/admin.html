@@ -6,6 +6,7 @@
     <title>Admin Dashboard - DronTeen</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <link rel="stylesheet" href="style.css">
     <style>
         :root {
@@ -306,6 +307,10 @@
         <div style="margin-top: 30px;">
             <h4 style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;"><i class="fas fa-shopping-basket" style="color: #0c831f;"></i> Recent Activity</h4>
             <div id="stDetailOrders" style="max-height: 200px; overflow-y: auto; background: white; border-radius: 12px; border: 1px solid #e2e8f0;"></div>
+        </div>
+        <div style="margin-top: 18px;">
+            <h4 style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;"><i class="fas fa-file-pdf" style="color: #0c831f;"></i> Transaction Receipts</h4>
+            <div id="stDetailTransactions" style="max-height: 180px; overflow-y: auto; background: white; border-radius: 12px; border: 1px solid #e2e8f0;"></div>
         </div>
     </div>
 </div>

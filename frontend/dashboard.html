@@ -6,6 +6,7 @@
     <title>DronTeen | Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -34,6 +35,8 @@
                 <div class="stat-card"><div class="stat-title">Total Spent (₹)</div><div class="stat-value" id="totalSpent">0</div></div>
                 <div class="stat-card"><div class="stat-title">Completed</div><div class="stat-value" id="completedOrders">0</div></div>
                 <div class="stat-card"><div class="stat-title">Pending</div><div class="stat-value" id="pendingOrders">0</div></div>
+                <div class="stat-card"><div class="stat-title">Today Spent</div><div class="stat-value" id="todaySpent">Rs 0</div></div>
+                <div class="stat-card"><div class="stat-title">Vs Yesterday</div><div class="stat-value" id="spendDeltaPercent">0%</div><div id="spendDeltaAmount" style="font-size:0.9rem; margin-top:6px;">Rs 0</div></div>
             </div>
             <div class="two-col">
                 <div class="glass-card">
@@ -83,7 +86,7 @@
         </div>
 
         <div id="ordersSection" style="display:none;"><div class="glass-card"><div class="section-title">All Orders <input type="text" id="searchOrders" placeholder="Search product..." style="padding:6px 12px; border-radius:20px;"></div><div id="allOrdersList"></div></div></div>
-        <div id="transactionsSection" style="display:none;"><div class="glass-card"><div class="section-title">💰 Transaction Ledger</div><table class="modern-table"><thead><tr><th>Order ID</th><th>Date</th><th>Amount</th><th>Type</th></tr></thead><tbody id="txnTableBody"></tbody></table></div></div>
+        <div id="transactionsSection" style="display:none;"><div class="glass-card"><div class="section-title">💰 Transaction Ledger</div><table class="modern-table"><thead><tr><th>Order ID</th><th>Date</th><th>Amount</th><th>Type</th><th>Receipt</th></tr></thead><tbody id="txnTableBody"></tbody></table></div></div>
         <div id="settingsSection" style="display:none;">
             <div class="glass-card">
                 <div class="section-title">
@@ -192,6 +195,27 @@
         <button class="btn-cancel-logout" id="cancelLogout">Cancel</button>
     </div>
 </div>
+<!-- Cancel Order Modal -->
+<div id="cancelOrderModal" class="modal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.45); z-index:2200; align-items:center; justify-content:center;">
+    <div style="background:#fff; width:min(520px,92vw); border-radius:20px; padding:24px; box-shadow:0 20px 50px rgba(0,0,0,0.2);">
+        <h3 style="margin-bottom:10px; color:#0f172a;">Cancel This Order?</h3>
+        <p style="color:#475569; font-size:14px; margin-bottom:16px;">You can cancel only within 2 minutes of placing the order.</p>
+        <label style="display:block; font-weight:600; color:#334155; margin-bottom:8px;">Why are you cancelling?</label>
+        <select id="cancelReasonSelect" style="width:100%; padding:12px 14px; border:1px solid #e2e8f0; border-radius:12px; margin-bottom:10px;">
+            <option value="">Select a reason</option>
+            <option value="Placed by mistake">Placed by mistake</option>
+            <option value="Changed my mind">Changed my mind</option>
+            <option value="Ordered wrong items">Ordered wrong items</option>
+            <option value="Taking too long">Taking too long</option>
+            <option value="Other">Other</option>
+        </select>
+        <textarea id="cancelReasonText" rows="3" placeholder="Add details (optional)" style="width:100%; padding:12px 14px; border:1px solid #e2e8f0; border-radius:12px; resize:vertical; margin-bottom:16px;"></textarea>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <button id="cancelModalCloseBtn" style="padding:10px 14px; border:none; border-radius:10px; background:#e2e8f0; color:#1e293b; cursor:pointer;">Keep Order</button>
+            <button id="cancelModalConfirmBtn" style="padding:10px 14px; border:none; border-radius:10px; background:#ef4444; color:#fff; cursor:pointer;">Yes, Cancel Order</button>
+        </div>
+    </div>
+</div>
 <script>
     const API_BASE = '';
     let token = localStorage.getItem('droneToken');
@@ -265,8 +289,8 @@
                 document.getElementById('totalOrders').innerText = orders.length;
                 const totalSpent = orders.reduce((s,o)=>s+(o.total||0),0);
                 document.getElementById('totalSpent').innerText = '₹' + totalSpent;
-                document.getElementById('completedOrders').innerText = orders.filter(o=>o.status==='confirmed').length;
-                document.getElementById('pendingOrders').innerText = orders.filter(o=>o.status==='pending').length;
+                document.getElementById('completedOrders').innerText = orders.filter(o=>o.status==='delivered').length;
+                document.getElementById('pendingOrders').innerText = orders.filter(o=>['pending','confirmed','preparing','ready'].includes(o.status)).length;
 
                 // Update Profile Stats
                 document.getElementById('profileTotalSpent').innerText = '₹' + totalSpent;
@@ -276,6 +300,18 @@
                 renderPurchaseHistory(orders);
                 renderProfileTransactions(orders);
                 renderMonthlyChart(orders);
+                renderFullOrders(orders);
+            }
+            const spendingRes = await fetchAPI('/api/user/spending/daily');
+            if (spendingRes.success) {
+                const s = spendingRes.spending;
+                const sign = s.difference >= 0 ? '+' : '';
+                const color = s.difference >= 0 ? '#16a34a' : '#dc2626';
+                document.getElementById('todaySpent').innerText = `Rs ${s.today}`;
+                document.getElementById('spendDeltaPercent').innerText = `${sign}${s.percentChange}%`;
+                document.getElementById('spendDeltaPercent').style.color = color;
+                document.getElementById('spendDeltaAmount').innerText = `${sign}Rs ${s.difference}`;
+                document.getElementById('spendDeltaAmount').style.color = color;
             }
             
             const supportRes = await fetchAPI('/api/support');
@@ -352,10 +388,42 @@
         const txnRes = await fetchAPI('/api/user/transactions');
         if (txnRes.success) {
             let tbody = '';
-            txnRes.transactions.forEach(t => tbody += `<tr><td>${t.orderId}</td><td>${new Date(t.createdAt).toLocaleDateString()}</td><td>₹${t.amount}</td><td>${t.type}</td></tr>`);
-            document.getElementById('txnTableBody').innerHTML = tbody || '<tr><td colspan="4">No transactions</td></tr>';
+            txnRes.transactions.forEach(t => {
+                const rowPayload = encodeURIComponent(JSON.stringify({
+                    orderId: t.orderId,
+                    receiptNumber: t.receiptNumber || `RCP-${t.orderId}`,
+                    amount: t.amount,
+                    type: t.type,
+                    paymentId: t.paymentId || '',
+                    createdAt: t.createdAt
+                }));
+                tbody += `<tr><td>${t.orderId}</td><td>${new Date(t.createdAt).toLocaleDateString()}</td><td>Rs ${t.amount}</td><td>${t.type}</td><td><button onclick="downloadReceiptFromLedger('${rowPayload}')" style="padding:6px 10px;border:none;border-radius:8px;background:#0c831f;color:#fff;cursor:pointer;">PDF</button></td></tr>`;
+            });
+            document.getElementById('txnTableBody').innerHTML = tbody || '<tr><td colspan="5">No transactions</td></tr>';
         }
     }
+    window.downloadReceiptFromLedger = (payload) => {
+        const txn = JSON.parse(decodeURIComponent(payload));
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const userName = document.getElementById('userName')?.innerText || 'Student';
+        const userEmail = document.getElementById('userEmail')?.innerText || '';
+
+        doc.setFontSize(18);
+        doc.text('DronTeen Payment Receipt', 14, 20);
+        doc.setFontSize(11);
+        doc.text(`Receipt No: ${txn.receiptNumber}`, 14, 32);
+        doc.text(`Order ID: ${txn.orderId}`, 14, 40);
+        doc.text(`Date: ${new Date(txn.createdAt).toLocaleString()}`, 14, 48);
+        doc.text(`Student: ${userName}`, 14, 56);
+        doc.text(`Email: ${userEmail}`, 14, 64);
+        doc.text(`Type: ${txn.type}`, 14, 72);
+        doc.text(`Amount: Rs ${txn.amount}`, 14, 80);
+        doc.text(`Payment ID: ${txn.paymentId || 'N/A'}`, 14, 88);
+        doc.text('Thank you for using DronTeen.', 14, 102);
+
+        doc.save(`Receipt-${txn.receiptNumber}.pdf`);
+    };
     function renderFullOrders(orders) {
         const container = document.getElementById('allOrdersList');
         if(!container) return;
@@ -369,9 +437,63 @@
                 <div class="order-right">
                     <span class="order-price">₹${o.total}</span>
                     <span class="status-badge ${o.status}">${o.status}</span>
+                    ${(o.status === 'pending' && (Date.now() - new Date(o.createdAt).getTime()) <= 120000)
+                        ? `<button data-cancel-order="${o.orderId}" onclick="cancelMyOrder('${o.orderId}', this)" style="background:#ef4444;color:#fff;border:none;padding:6px 12px;border-radius:10px;cursor:pointer;font-weight:600;">Cancel Order</button>`
+                        : ''}
                 </div>
             </div>`).join('');
     }
+    let pendingCancelOrderId = null;
+    let pendingCancelBtn = null;
+    const cancelOrderModal = document.getElementById('cancelOrderModal');
+    const cancelReasonSelect = document.getElementById('cancelReasonSelect');
+    const cancelReasonText = document.getElementById('cancelReasonText');
+    const cancelModalCloseBtn = document.getElementById('cancelModalCloseBtn');
+    const cancelModalConfirmBtn = document.getElementById('cancelModalConfirmBtn');
+
+    function closeCancelModal() {
+        cancelOrderModal.style.display = 'none';
+        cancelReasonSelect.value = '';
+        cancelReasonText.value = '';
+        pendingCancelOrderId = null;
+        pendingCancelBtn = null;
+        cancelModalConfirmBtn.disabled = false;
+        cancelModalConfirmBtn.innerText = 'Yes, Cancel Order';
+    }
+
+    window.cancelMyOrder = (orderId, btnEl) => {
+        pendingCancelOrderId = orderId;
+        pendingCancelBtn = btnEl || null;
+        cancelOrderModal.style.display = 'flex';
+    };
+
+    cancelModalCloseBtn.addEventListener('click', closeCancelModal);
+    cancelOrderModal.addEventListener('click', (e) => {
+        if (e.target === cancelOrderModal) closeCancelModal();
+    });
+    cancelModalConfirmBtn.addEventListener('click', async () => {
+        if (!pendingCancelOrderId) return;
+        const reasonBase = cancelReasonSelect.value.trim();
+        const reasonExtra = cancelReasonText.value.trim();
+        const reason = reasonExtra ? (reasonBase ? `${reasonBase}: ${reasonExtra}` : reasonExtra) : reasonBase;
+
+        cancelModalConfirmBtn.disabled = true;
+        cancelModalConfirmBtn.innerText = 'Cancelling...';
+        const res = await fetchAPI(`/api/user/orders/${pendingCancelOrderId}/cancel`, {
+            method: 'PUT',
+            body: JSON.stringify({ reason })
+        });
+
+        if (res.success) {
+            showToast('Order cancelled successfully');
+            closeCancelModal();
+            refreshUserData();
+        } else {
+            showToast(res.message || 'Unable to cancel order', true);
+            cancelModalConfirmBtn.disabled = false;
+            cancelModalConfirmBtn.innerText = 'Yes, Cancel Order';
+        }
+    });
     document.getElementById('searchOrders')?.addEventListener('input', async (e) => {
         const term = e.target.value.toLowerCase();
         const res = await fetchAPI('/api/user/orders');
@@ -435,7 +557,7 @@
         document.getElementById(sections[target]).style.display = 'block'; 
         tabs.forEach(t=>t.classList.remove('active')); 
         tab.classList.add('active'); 
-        if (target === 'profile' || target === 'overview' || target === 'support') refreshUserData();
+        if (target === 'profile' || target === 'overview' || target === 'support' || target === 'orders') refreshUserData();
     }));
 
     document.getElementById('photoUpload').addEventListener('change', function(e) {

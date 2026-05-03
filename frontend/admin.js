@@ -2,6 +2,14 @@
 if (!token) window.location.href = '/admin-login.html';
 
 let currentProductId = null;
+const ORDER_STATUS_TRANSITIONS = {
+    pending: ['confirmed', 'cancelled'],
+    confirmed: ['preparing', 'cancelled'],
+    preparing: ['ready', 'cancelled'],
+    ready: ['delivered', 'cancelled'],
+    delivered: [],
+    cancelled: []
+};
 
 async function fetchAPI(endpoint, options = {}) {
     const res = await fetch(endpoint, {
@@ -44,14 +52,22 @@ function showConfirm(title, text, okText = 'Delete') {
 
 // Load dashboard stats
 async function loadDashboard() {
-    const data = await fetchAPI('/api/admin/stats');
+    const [data, earningsRes] = await Promise.all([
+        fetchAPI('/api/admin/stats'),
+        fetchAPI('/api/admin/earnings/daily')
+    ]);
     if (data.success) {
         const stats = data.stats;
+        const earnings = earningsRes?.success ? earningsRes.earnings : { today: 0, yesterday: 0, difference: 0, percentChange: 0 };
+        const trendColor = earnings.difference >= 0 ? '#16a34a' : '#dc2626';
+        const trendSign = earnings.difference >= 0 ? '+' : '';
         document.getElementById('statsGrid').innerHTML = `
             <div class="stat-card"><div class="stat-title">Total Users</div><div class="stat-value">${stats.totalUsers}</div></div>
             <div class="stat-card"><div class="stat-title">Total Orders</div><div class="stat-value">${stats.totalOrders}</div></div>
             <div class="stat-card"><div class="stat-title">Revenue (Rs)</div><div class="stat-value">Rs ${stats.totalRevenue}</div></div>
             <div class="stat-card"><div class="stat-title">Products</div><div class="stat-value">${stats.totalProducts}</div></div>
+            <div class="stat-card"><div class="stat-title">Today Earnings</div><div class="stat-value">Rs ${earnings.today}</div></div>
+            <div class="stat-card"><div class="stat-title">Vs Yesterday</div><div class="stat-value" style="color:${trendColor};">${trendSign}${earnings.percentChange}%</div><div style="font-size:0.9rem;color:${trendColor};margin-top:6px;">${trendSign}Rs ${earnings.difference}</div></div>
         `;
         let ordersHtml = '<table><tr><th>Order ID</th><th>User</th><th>Total</th><th>Status</th><th>Date</th></tr>';
         data.recentOrders.forEach(o => {
@@ -116,7 +132,41 @@ window.viewStudent = async (id) => {
             ordersHtml += `<tr><td>${o.orderId}</td><td>${new Date(o.createdAt).toLocaleDateString()}</td><td>Rs ${o.total}</td><td><span class="status-badge status-${o.status}">${o.status}</span></td></tr>`;
         });
         document.getElementById('stDetailOrders').innerHTML = ordersHtml + '</tbody></table>';
+
+        let txHtml = '<table><thead><tr><th>Receipt</th><th>Date</th><th>Amount</th><th>Action</th></tr></thead><tbody>';
+        (data.transactions || []).forEach(t => {
+            const payload = encodeURIComponent(JSON.stringify({
+                receiptNumber: t.receiptNumber || `RCP-${t.orderId}`,
+                orderId: t.orderId,
+                amount: t.amount,
+                type: t.type,
+                paymentId: t.paymentId || '',
+                createdAt: t.createdAt,
+                userName: data.user.name,
+                userEmail: data.user.email
+            }));
+            txHtml += `<tr><td>${t.receiptNumber || `RCP-${t.orderId}`}</td><td>${new Date(t.createdAt).toLocaleDateString()}</td><td>Rs ${t.amount}</td><td><button onclick="downloadStudentReceipt('${payload}')" style="padding:6px 10px;background:#0c831f;color:#fff;border:none;border-radius:8px;cursor:pointer;">PDF</button></td></tr>`;
+        });
+        document.getElementById('stDetailTransactions').innerHTML = txHtml + '</tbody></table>';
     }
+};
+window.downloadStudentReceipt = (payload) => {
+    const txn = JSON.parse(decodeURIComponent(payload));
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text('DronTeen Payment Receipt', 14, 20);
+    doc.setFontSize(11);
+    doc.text(`Receipt No: ${txn.receiptNumber}`, 14, 32);
+    doc.text(`Order ID: ${txn.orderId}`, 14, 40);
+    doc.text(`Date: ${new Date(txn.createdAt).toLocaleString()}`, 14, 48);
+    doc.text(`Student: ${txn.userName}`, 14, 56);
+    doc.text(`Email: ${txn.userEmail}`, 14, 64);
+    doc.text(`Type: ${txn.type}`, 14, 72);
+    doc.text(`Amount: Rs ${txn.amount}`, 14, 80);
+    doc.text(`Payment ID: ${txn.paymentId || 'N/A'}`, 14, 88);
+    doc.text('Generated from Admin Panel', 14, 102);
+    doc.save(`Receipt-${txn.receiptNumber}.pdf`);
 };
 window.toggleAdmin = async (id, currentRole) => {
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
@@ -143,8 +193,12 @@ async function loadOrders() {
             let items = o.items.map(i => `${i.name} x${i.quantity}`).join(', ');
             let ratingDisplay = o.rating ? '*'.repeat(o.rating) : 'N/A';
             let feedbackDisplay = o.feedback ? `<br><small style="color:#64748b;">"${o.feedback}"</small>` : '';
+            const allowedNext = ORDER_STATUS_TRANSITIONS[o.status] || [];
+            const statusOptions = [o.status, ...allowedNext]
+                .map(s => `<option value="${s}" ${o.status===s?'selected':''}>${s}</option>`)
+                .join('');
             html += `<tr><td>${o.orderId}</td><td>${o.userId?.name || 'N/A'}</td><td>${items}</td><td>Rs ${o.total}</td>
-            <td><select id="status-${o.orderId}" onchange="updateStatus('${o.orderId}', this.value)"><option ${o.status==='pending'?'selected':''}>pending</option><option ${o.status==='confirmed'?'selected':''}>confirmed</option><option ${o.status==='delivered'?'selected':''}>delivered</option></select></td>
+            <td><select id="status-${o.orderId}" onchange="updateStatus('${o.orderId}', this.value)">${statusOptions}</select></td>
             <td>${ratingDisplay}${feedbackDisplay}</td>
             <td>${new Date(o.createdAt).toLocaleDateString()}</td>
             <td><button onclick="deleteOrder('${o.orderId}')">Delete</button></td></tr>`;
@@ -154,7 +208,8 @@ async function loadOrders() {
     }
 }
 window.updateStatus = async (orderId, status) => {
-    await fetchAPI(`/api/admin/orders/${orderId}`, { method: 'PUT', body: JSON.stringify({ status }) });
+    const res = await fetchAPI(`/api/admin/orders/${orderId}`, { method: 'PUT', body: JSON.stringify({ status }) });
+    if (!res.success) showToast(res.message || 'Failed to update status', true);
     loadOrders();
 };
 window.deleteOrder = async (orderId) => {

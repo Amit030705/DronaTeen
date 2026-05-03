@@ -41,7 +41,8 @@ const orderSchema = new mongoose.Schema({
     total: Number,
     paymentMethod: String,
     paymentId: String,
-    status: { type: String, default: 'pending' },
+    status: { type: String, enum: ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'cancelled'], default: 'pending' },
+    cancelReason: { type: String, default: '' },
     rating: { type: Number, min: 1, max: 5 },
     feedback: String,
     createdAt: { type: Date, default: Date.now }
@@ -63,6 +64,7 @@ const userSchema = new mongoose.Schema({
 const transactionSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     orderId: String,
+    receiptNumber: String,
     amount: Number,
     type: { type: String, enum: ['purchase', 'refund'], default: 'purchase' },
     paymentId: String,
@@ -119,6 +121,16 @@ async function seedAdmin() {
 }
 seedAdmin();
 const Product = mongoose.model('Product', productSchema);
+const makeReceiptNumber = (orderId = '') => `RCP-${orderId || Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+const ORDER_STATUS_TRANSITIONS = {
+    pending: ['confirmed', 'cancelled'],
+    confirmed: ['preparing', 'cancelled'],
+    preparing: ['ready', 'cancelled'],
+    ready: ['delivered', 'cancelled'],
+    delivered: [],
+    cancelled: []
+};
 
 // ======================== EMAIL ========================
 const transporter = nodemailer.createTransport({
@@ -225,6 +237,93 @@ app.get('/api/user/orders', authMiddleware, async (req, res) => {
     const orders = await Order.find({ userId: req.userId }).sort({ createdAt: -1 });
     res.json({ success: true, orders });
 });
+app.get('/api/user/spending/daily', authMiddleware, async (req, res) => {
+    try {
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        const last7Start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+
+        const todayAgg = await Order.aggregate([
+            { $match: { userId: new mongoose.Types.ObjectId(req.userId), createdAt: { $gte: todayStart, $lt: tomorrowStart }, status: { $ne: 'cancelled' } } },
+            { $group: { _id: null, total: { $sum: "$total" } } }
+        ]);
+        const yesterdayAgg = await Order.aggregate([
+            { $match: { userId: new mongoose.Types.ObjectId(req.userId), createdAt: { $gte: yesterdayStart, $lt: todayStart }, status: { $ne: 'cancelled' } } },
+            { $group: { _id: null, total: { $sum: "$total" } } }
+        ]);
+        const dailyAgg = await Order.aggregate([
+            { $match: { userId: new mongoose.Types.ObjectId(req.userId), createdAt: { $gte: last7Start, $lt: tomorrowStart }, status: { $ne: 'cancelled' } } },
+            {
+                $group: {
+                    _id: {
+                        year: { $year: "$createdAt" },
+                        month: { $month: "$createdAt" },
+                        day: { $dayOfMonth: "$createdAt" }
+                    },
+                    total: { $sum: "$total" }
+                }
+            },
+            { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } }
+        ]);
+
+        const today = todayAgg[0]?.total || 0;
+        const yesterday = yesterdayAgg[0]?.total || 0;
+        const difference = today - yesterday;
+        const percentChange = yesterday === 0 ? (today > 0 ? 100 : 0) : Number(((difference / yesterday) * 100).toFixed(2));
+
+        const daily = dailyAgg.map(d => ({
+            date: `${d._id.year}-${String(d._id.month).padStart(2, '0')}-${String(d._id.day).padStart(2, '0')}`,
+            total: d.total
+        }));
+
+        res.json({ success: true, spending: { today, yesterday, difference, percentChange, daily } });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+app.put('/api/user/orders/:orderId/cancel', authMiddleware, async (req, res) => {
+    try {
+        const { reason } = req.body;
+        const order = await Order.findOne({ orderId: req.params.orderId, userId: req.userId });
+        if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+        const now = Date.now();
+        const createdAtMs = new Date(order.createdAt).getTime();
+        const twoMinutesMs = 2 * 60 * 1000;
+        const withinCancelWindow = (now - createdAtMs) <= twoMinutesMs;
+
+        if (order.status !== 'pending') {
+            return res.status(400).json({ success: false, message: 'Order can no longer be cancelled by student' });
+        }
+        if (!withinCancelWindow) {
+            return res.status(400).json({ success: false, message: '2-minute cancellation window has expired' });
+        }
+
+        // Restore stock on cancel
+        for (const item of order.items) {
+            await Product.findByIdAndUpdate(item.id, { $inc: { stock: item.quantity } });
+        }
+
+        order.status = 'cancelled';
+        order.cancelReason = (reason || '').toString().trim().slice(0, 200);
+        await order.save();
+
+        await new Transaction({
+            userId: req.userId,
+            orderId: order.orderId,
+            receiptNumber: makeReceiptNumber(order.orderId),
+            amount: order.total,
+            type: 'refund',
+            paymentId: order.paymentId || ''
+        }).save();
+
+        res.json({ success: true, message: 'Order cancelled successfully', order });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
 app.get('/api/user/transactions', authMiddleware, async (req, res) => {
     const transactions = await Transaction.find({ userId: req.userId }).sort({ createdAt: -1 });
     res.json({ success: true, transactions });
@@ -253,10 +352,17 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
         }
 
         const orderId = `ORD${Date.now()}${Math.floor(Math.random() * 1000)}`;
-        const order = new Order({ orderId, userId: req.userId, items, total, paymentMethod, paymentId, status: 'confirmed' });
+        const order = new Order({ orderId, userId: req.userId, items, total, paymentMethod, paymentId, status: 'pending' });
         await order.save();
         
-        await new Transaction({ userId: req.userId, orderId, amount: total, type: 'purchase', paymentId }).save();
+        await new Transaction({
+            userId: req.userId,
+            orderId,
+            receiptNumber: makeReceiptNumber(orderId),
+            amount: total,
+            type: 'purchase',
+            paymentId
+        }).save();
         sendAdminAlert('New Order Placed', user, req, { orderAmount: total });
         
         res.status(201).json({ success: true, orderId, _id: order._id });
@@ -324,7 +430,8 @@ app.get('/api/admin/users/:id', adminMiddleware, async (req, res) => {
     try {
         const user = await User.findById(req.params.id).select('-password');
         const orders = await Order.find({ userId: req.params.id }).sort({ createdAt: -1 });
-        res.json({ success: true, user, orders });
+        const transactions = await Transaction.find({ userId: req.params.id }).sort({ createdAt: -1 });
+        res.json({ success: true, user, orders, transactions });
     } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 // Delete user
@@ -340,7 +447,21 @@ app.get('/api/admin/orders', adminMiddleware, async (req, res) => {
 });
 app.put('/api/admin/orders/:orderId', adminMiddleware, async (req, res) => {
     const { status } = req.body;
-    const order = await Order.findOneAndUpdate({ orderId: req.params.orderId }, { status }, { new: true });
+    const order = await Order.findOne({ orderId: req.params.orderId });
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    const currentStatus = order.status;
+    const nextAllowed = ORDER_STATUS_TRANSITIONS[currentStatus] || [];
+    if (!nextAllowed.includes(status)) {
+        return res.status(400).json({
+            success: false,
+            message: `Invalid status transition from ${currentStatus} to ${status}`,
+            allowedNext: nextAllowed
+        });
+    }
+
+    order.status = status;
+    await order.save();
     res.json({ success: true, order });
 });
 app.delete('/api/admin/orders/:orderId', adminMiddleware, async (req, res) => {
@@ -403,6 +524,44 @@ app.get('/api/admin/stats', adminMiddleware, async (req, res) => {
     const totalProducts = await Product.countDocuments();
     const recentOrders = await Order.find().sort({ createdAt: -1 }).limit(5);
     res.json({ success: true, stats: { totalUsers, totalOrders, totalRevenue: totalRevenue[0]?.total || 0, totalProducts }, recentOrders });
+});
+
+// Daily earnings + day-over-day profit comparison
+app.get('/api/admin/earnings/daily', adminMiddleware, async (req, res) => {
+    try {
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+
+        const todayAgg = await Order.aggregate([
+            { $match: { createdAt: { $gte: todayStart, $lt: tomorrowStart }, status: { $ne: 'cancelled' } } },
+            { $group: { _id: null, total: { $sum: "$total" } } }
+        ]);
+        const yesterdayAgg = await Order.aggregate([
+            { $match: { createdAt: { $gte: yesterdayStart, $lt: todayStart }, status: { $ne: 'cancelled' } } },
+            { $group: { _id: null, total: { $sum: "$total" } } }
+        ]);
+
+        const todayEarnings = todayAgg[0]?.total || 0;
+        const yesterdayEarnings = yesterdayAgg[0]?.total || 0;
+        const difference = todayEarnings - yesterdayEarnings;
+        const percentChange = yesterdayEarnings === 0
+            ? (todayEarnings > 0 ? 100 : 0)
+            : Number((((difference) / yesterdayEarnings) * 100).toFixed(2));
+
+        res.json({
+            success: true,
+            earnings: {
+                today: todayEarnings,
+                yesterday: yesterdayEarnings,
+                difference,
+                percentChange
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 // Seeding Logic
