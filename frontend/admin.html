@@ -8,28 +8,183 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="style.css">
     <style>
-        body { background: #f1f5f9; }
+        :root {
+            --primary: #0c831f;
+            --primary-dark: #0a6e1a;
+            --bg-body: #f8fafc;
+            --sidebar-bg: #0f172a;
+            --card-shadow: 0 4px 20px rgba(0,0,0,0.03);
+            --glass-bg: rgba(255, 255, 255, 0.85);
+        }
+        body { background: var(--bg-body); color: #1e293b; overflow-x: hidden; }
         .admin-container { display: flex; min-height: 100vh; }
-        .sidebar { width: 260px; background: #1e293b; color: white; padding: 24px; }
-        .sidebar h3 { margin-bottom: 30px; }
-        .sidebar .nav-item { padding: 12px; margin: 8px 0; border-radius: 12px; cursor: pointer; transition: 0.2s; }
-        .sidebar .nav-item:hover, .sidebar .nav-item.active { background: #0c831f; }
-        .main-content { flex: 1; padding: 24px; overflow-y: auto; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .stat-card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        .stat-value { font-size: 32px; font-weight: 800; color: #0c831f; }
-        .card { background: white; border-radius: 24px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #e2e8f0; }
-        .status-badge { padding: 4px 12px; border-radius: 30px; font-size: 12px; font-weight: 600; }
-        .status-confirmed { background: #d1fae5; color: #065f46; }
-        .status-pending { background: #fed7aa; color: #92400e; }
-        button { background: #0c831f; color: white; border: none; padding: 6px 12px; border-radius: 20px; cursor: pointer; }
-        .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; }
-        .modal-content { background: white; border-radius: 24px; padding: 24px; width: 500px; max-width: 90%; }
-        .close { float: right; font-size: 24px; cursor: pointer; }
-        input, select, textarea { width: 100%; padding: 10px; margin-bottom: 12px; border-radius: 20px; border: 1px solid #ccc; }
-        .toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: white; padding: 12px 20px; border-radius: 40px; z-index: 2000; }
+        
+        /* Sidebar */
+        .sidebar { 
+            width: 280px; 
+            background: var(--sidebar-bg); 
+            color: white; 
+            padding: 35px 24px; 
+            position: sticky; 
+            top: 0; 
+            height: 100vh;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.05);
+            z-index: 100;
+        }
+        .sidebar h3 { 
+            font-size: 24px; 
+            font-weight: 800; 
+            margin-bottom: 40px; 
+            display: flex; 
+            align-items: center; 
+            gap: 12px;
+            color: #f8fafc;
+        }
+        .sidebar .nav-item { 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            padding: 14px 20px; 
+            margin: 10px 0; 
+            border-radius: 18px; 
+            cursor: pointer; 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            font-weight: 500;
+            color: #94a3b8;
+        }
+        .sidebar .nav-item:hover { background: rgba(255,255,255,0.05); color: #f8fafc; }
+        .sidebar .nav-item.active { background: var(--primary); color: white; box-shadow: 0 10px 20px rgba(12,131,31,0.25); }
+        .sidebar .nav-item i { font-size: 1.1rem; width: 24px; }
+
+        /* Main Content */
+        .main-content { flex: 1; padding: 40px 50px; background: #f1f5f9; }
+        h1 { font-size: 2.2rem; font-weight: 800; margin-bottom: 35px; color: #0f172a; letter-spacing: -1px; }
+
+        /* Dashboard Stats */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 28px; margin-bottom: 40px; }
+        .stat-card { 
+            background: white; 
+            border-radius: 28px; 
+            padding: 30px; 
+            box-shadow: var(--card-shadow); 
+            border: 1px solid #ffffff;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::after {
+            content: ''; position: absolute; top: 0; right: 0; width: 100px; height: 100px;
+            background: var(--primary); opacity: 0.03; border-radius: 50%; transform: translate(30%, -30%);
+        }
+        .stat-card:hover { transform: translateY(-8px); box-shadow: 0 20px 40px rgba(0,0,0,0.06); }
+        .stat-title { font-size: 0.95rem; color: #64748b; font-weight: 600; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 2.4rem; font-weight: 900; color: #0f172a; }
+
+        .card { 
+            background: white; 
+            border-radius: 32px; 
+            padding: 35px; 
+            margin-bottom: 30px; 
+            box-shadow: var(--card-shadow); 
+            border: 1px solid rgba(255,255,255,0.7);
+        }
+        .card h3 { font-size: 1.4rem; font-weight: 800; margin-bottom: 25px; color: #0f172a; display: flex; align-items: center; gap: 12px; }
+
+        /* Tables */
+        .table-container { width: 100%; overflow-x: auto; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0 10px; margin-top: -10px; }
+        th { text-align: left; padding: 15px 20px; color: #64748b; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+        td { 
+            padding: 20px; 
+            background: white; 
+            color: #1e293b; 
+            font-size: 0.95rem;
+            border-top: 1px solid #f1f5f9;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        td:first-child { border-left: 1px solid #f1f5f9; border-top-left-radius: 16px; border-bottom-left-radius: 16px; }
+        td:last-child { border-right: 1px solid #f1f5f9; border-top-right-radius: 16px; border-bottom-right-radius: 16px; }
+        tr:hover td { background: #f8fafc; }
+
+        /* Badges & Buttons */
+        .status-badge { padding: 8px 16px; border-radius: 12px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+        .status-confirmed { background: #dcfce7; color: #166534; }
+        .status-pending { background: #fef9c3; color: #854d0e; }
+        .status-delivered { background: #dbeafe; color: #1e40af; }
+        
+        .canteen-badge { background: #f1f5f9; color: #475569; padding: 6px 12px; border-radius: 10px; font-family: 'Courier New', monospace; font-weight: 700; border: 1px solid #e2e8f0; }
+
+        button { 
+            background: var(--primary); 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 14px; 
+            cursor: pointer; 
+            font-weight: 700; 
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(12,131,31,0.15);
+        }
+        button:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 8px 15px rgba(12,131,31,0.25); }
+        button i { font-size: 0.85rem; }
+
+        /* Modals */
+        .modal { 
+            display: none; 
+            position: fixed; 
+            top:0; left:0; width:100%; height:100%; 
+            background: rgba(15, 23, 42, 0.6); 
+            backdrop-filter: blur(8px);
+            align-items: center; 
+            justify-content: center; 
+            z-index: 1000; 
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-content { 
+            background: white; 
+            border-radius: 32px; 
+            padding: 40px; 
+            width: 550px; 
+            max-width: 90%; 
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        input, select, textarea { 
+            width: 100%; 
+            padding: 14px 20px; 
+            margin-bottom: 15px; 
+            border-radius: 16px; 
+            border: 1px solid #e2e8f0; 
+            background: #f8fafc;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        input:focus { border-color: var(--primary); outline: none; background: white; box-shadow: 0 0 0 4px rgba(12,131,31,0.1); }
+        
+        .toast { 
+            position: fixed; 
+            bottom: 30px; 
+            right: 30px; 
+            background: #1e293b; 
+            color: white; 
+            padding: 16px 30px; 
+            border-radius: 20px; 
+            z-index: 2000; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: toastSlide 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes toastSlide { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>
 </head>
 <body>
@@ -40,6 +195,7 @@
         <div class="nav-item" data-section="users"><i class="fas fa-users"></i> Users</div>
         <div class="nav-item" data-section="orders"><i class="fas fa-shopping-cart"></i> Orders</div>
         <div class="nav-item" data-section="products"><i class="fas fa-box"></i> Products</div>
+        <div class="nav-item" data-section="settings"><i class="fas fa-cog"></i> Settings</div>
         <div class="nav-item" id="logoutAdmin"><i class="fas fa-sign-out-alt"></i> Logout</div>
     </div>
     <div class="main-content">
@@ -67,6 +223,27 @@
         <!-- Products Section -->
         <div id="productsSection" style="display:none;">
             <div class="card"><button id="addProductBtn" style="margin-bottom:20px;">+ Add New Product</button><div id="productsTable"></div></div>
+        </div>
+        <!-- Settings Section -->
+        <div id="settingsSection" style="display:none;">
+            <div class="card">
+                <h3>Admin Settings</h3>
+                <form id="adminSettingsForm" style="margin-top:20px;">
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; margin-bottom:5px; font-weight:600;">Full Name</label>
+                        <input type="text" id="adminNameInput">
+                    </div>
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; margin-bottom:5px; font-weight:600;">Phone Number</label>
+                        <input type="text" id="adminPhoneInput" placeholder="Enter phone number">
+                    </div>
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block; margin-bottom:5px; font-weight:600;">Office Address</label>
+                        <input type="text" id="adminAddressInput">
+                    </div>
+                    <button type="submit" style="padding: 10px 20px;">Update Admin Info</button>
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -99,7 +276,7 @@
                 <h2 id="stDetailName">Student Name</h2>
                 <p id="stDetailEmail" style="color: #64748b;"></p>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
-                    <div><label style="font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Roll Number</label><div id="stDetailRoll" style="font-weight: 700; color: #1e293b;"></div></div>
+                    <div id="stDetailRollGroup"><label style="font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Roll Number</label><div id="stDetailRoll" style="font-weight: 700; color: #1e293b;"></div></div>
                     <div><label style="font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Canteen ID</label><div id="stDetailCanteen" style="font-weight: 700; color: #1e293b;"></div></div>
                 </div>
             </div>

@@ -48,6 +48,7 @@ const userSchema = new mongoose.Schema({
     rollNumber: { type: String, default: 'Not Set' },
     canteenId: { type: String, unique: true, sparse: true },
     profileImage: { type: String, default: '' },
+    phone: { type: String, default: '' },
     address: { type: String, default: 'Greater Noida, Noida' },
     prefPayment: { type: String, default: 'UPI' },
     role: { type: String, enum: ['user', 'admin'], default: 'user' },
@@ -174,7 +175,7 @@ app.get('/api/user/profile', authMiddleware, async (req, res) => {
 });
 app.put('/api/user/profile', authMiddleware, async (req, res) => {
     const body = req.body;
-    const allowedUpdates = ['name', 'email', 'address', 'prefPayment', 'rollNumber', 'canteenId', 'profileImage'];
+    const allowedUpdates = ['name', 'email', 'address', 'phone', 'prefPayment', 'rollNumber', 'canteenId', 'profileImage'];
     const updates = {};
     
     allowedUpdates.forEach(key => {

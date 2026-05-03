@@ -92,6 +92,9 @@ window.viewStudent = async (id) => {
         document.getElementById('stDetailCanteen').innerText = data.user.canteenId || 'Not Set';
         document.getElementById('stDetailImg').src = data.user.profileImage || 'https://via.placeholder.com/150';
         
+        // Hide Roll No for admins
+        document.getElementById('stDetailRollGroup').style.display = data.user.role === 'admin' ? 'none' : 'block';
+        
         const roleBadge = document.getElementById('stDetailRoleBadge');
         const roleBtn = document.getElementById('stChangeRoleBtn');
         roleBadge.innerText = data.user.role.toUpperCase();
@@ -221,12 +224,35 @@ document.querySelectorAll('.nav-item[data-section]').forEach(item => {
         document.getElementById('usersSection').style.display = section === 'users' ? 'block' : 'none';
         document.getElementById('ordersSection').style.display = section === 'orders' ? 'block' : 'none';
         document.getElementById('productsSection').style.display = section === 'products' ? 'block' : 'none';
+        document.getElementById('settingsSection').style.display = section === 'settings' ? 'block' : 'none';
+        
         if(section === 'users') loadUsers();
         if(section === 'orders') loadOrders();
         if(section === 'products') loadProducts();
         if(section === 'dashboard') loadDashboard();
+        if(section === 'settings') loadAdminSettings();
     });
 });
+
+async function loadAdminSettings() {
+    const data = await fetchAPI('/api/user/profile');
+    if (data.success) {
+        document.getElementById('adminNameInput').value = data.user.name || '';
+        document.getElementById('adminPhoneInput').value = data.user.phone || '';
+        document.getElementById('adminAddressInput').value = data.user.address || '';
+    }
+}
+
+document.getElementById('adminSettingsForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const updates = {
+        name: document.getElementById('adminNameInput').value,
+        phone: document.getElementById('adminPhoneInput').value,
+        address: document.getElementById('adminAddressInput').value
+    };
+    const res = await fetchAPI('/api/user/profile', { method: 'PUT', body: JSON.stringify(updates) });
+    if (res.success) showToast('Admin settings updated');
+};
 
 // Global Modal Close logic
 document.getElementById('closeStudentModal').onclick = () => { document.getElementById('studentModal').style.display = 'none'; };
