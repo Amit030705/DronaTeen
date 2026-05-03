@@ -71,6 +71,7 @@ const transactionSchema = new mongoose.Schema({
 const productSchema = new mongoose.Schema({
     name: { type: String, required: true },
     price: { type: Number, required: true },
+    discountPercent: { type: Number, default: 0, min: 0, max: 100 },
     weight: String,
     image: String,
     popularity: { type: Number, default: 0 },

@@ -1,4 +1,4 @@
-// Check authentication – redirect to login if no token
+﻿// Check authentication - redirect to login if no token
 if (!localStorage.getItem('droneToken')) window.location.href = '/login.html';
 
 let products = [];
@@ -12,8 +12,10 @@ async function loadProductsFromAPI() {
                 id: p._id,
                 name: p.name,
                 price: p.price,
-                weight: p.weight,
+                discountPercent: p.discountPercent || 0,
+                finalPrice: Math.round((p.price || 0) * (1 - ((p.discountPercent || 0) / 100))),
                 image: p.image,
+                weight: p.weight,
                 popularity: p.popularity || 5,
                 category: p.category,
                 stock: p.stock // Added stock
@@ -61,8 +63,9 @@ function renderProducts(productList) {
             <div class="product-info">
                 <div class="product-name">${prod.name}</div>
                 <div class="product-weight">${prod.weight}</div>
-                <div class="product-price">₹${prod.price}</div>
-                <button class="add-to-cart" data-id="${prod.id}" data-name="${prod.name}" data-price="${prod.price}" ${isSoldOut ? 'disabled' : ''}>
+                <div class="product-price">Rs ${prod.finalPrice}</div>
+                ${prod.discountPercent > 0 ? `<div style="font-size: 12px; color: #64748b; margin-bottom: 10px;"><s>Rs ${prod.price}</s> - ${prod.discountPercent}% OFF</div>` : ''}
+                <button class="add-to-cart" data-id="${prod.id}" data-name="${prod.name}" data-price="${prod.finalPrice}" ${isSoldOut ? 'disabled' : ''}>
                     ${isSoldOut ? 'Sold Out' : 'Add to Cart'}
                 </button>
             </div>`;
@@ -101,7 +104,7 @@ function updateCart() {
     cart.forEach(item => {
         const cartItem = document.createElement('div');
         cartItem.className = 'cart-item';
-        cartItem.innerHTML = `<div class="cart-item-info"><div class="cart-item-name">${item.name}</div><div class="cart-item-price">₹${item.price}</div></div><div class="cart-item-quantity"><button class="quantity-btn minus" data-id="${item.id}">-</button><span class="quantity-value">${item.quantity}</span><button class="quantity-btn plus" data-id="${item.id}">+</button></div>`;
+        cartItem.innerHTML = `<div class="cart-item-info"><div class="cart-item-name">${item.name}</div><div class="cart-item-price">Rs ${item.price}</div></div><div class="cart-item-quantity"><button class="quantity-btn minus" data-id="${item.id}">-</button><span class="quantity-value">${item.quantity}</span><button class="quantity-btn plus" data-id="${item.id}">+</button></div>`;
         cartItems.appendChild(cartItem);
     });
     document.querySelectorAll('.quantity-btn.plus').forEach(btn => btn.addEventListener('click', function() { 
@@ -119,8 +122,8 @@ function updateCart() {
     const totalItems = cart.reduce((t,i)=>t+i.quantity,0);
     const totalValue = cart.reduce((t,i)=>t+i.price*i.quantity,0);
     cartCount.textContent = `(${totalItems} ${totalItems===1?'item':'items'})`;
-    itemTotal.textContent = `₹${totalValue}`;
-    cartTotal.textContent = `₹${totalValue+25+2}`;
+    itemTotal.textContent = `Rs ${totalValue}`;
+    cartTotal.textContent = `Rs ${totalValue+25+2}`;
     checkoutBtn.disabled = cart.length === 0;
 }
 

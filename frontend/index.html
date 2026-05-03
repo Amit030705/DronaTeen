@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>DronTeen – Fast Grocery Delivery</title>
+    <title>DronTeen - Fast Grocery Delivery</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <style>
@@ -184,7 +184,7 @@
         .rating-stars label { font-size: 2.5rem; color: #cbd5e1; cursor: pointer; transition: 0.2s; }
         .rating-stars label:hover, .rating-stars label:hover ~ label, .rating-stars input:checked ~ label { color: #f59e0b; }
         #ratingFeedback { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid #e5e7eb; margin-bottom: 20px; resize: vertical; background: #f8fafc; font-family: inherit; }
-        }
+        
 
         /* Rating Modal Styles */
         .rating-stars { display: flex; justify-content: center; gap: 10px; margin: 20px 0; flex-direction: row-reverse; }
@@ -192,6 +192,21 @@
         .rating-stars label { font-size: 2.5rem; color: #cbd5e1; cursor: pointer; transition: 0.2s; }
         .rating-stars label:hover, .rating-stars label:hover ~ label, .rating-stars input:checked ~ label, .rating-stars input:checked ~ label ~ label { color: #f59e0b; }
         #ratingFeedback { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid #e5e7eb; margin-bottom: 20px; resize: vertical; background: #f8fafc; font-family: inherit; }
+
+        /* Chatbot Styles */
+        #botBtn { position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; background: #0c831f; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; cursor: pointer; box-shadow: 0 4px 15px rgba(12, 131, 31, 0.4); z-index: 1000; transition: 0.3s; }
+        #botBtn:hover { transform: scale(1.1); }
+        #chatWindow { position: fixed; bottom: 100px; right: 30px; width: 350px; height: 450px; background: white; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); display: none; flex-direction: column; z-index: 1000; overflow: hidden; border: 1px solid #e5e7eb; }
+        .chat-header { background: #0c831f; color: white; padding: 15px 20px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .chat-header i.fa-times { cursor: pointer; }
+        .chat-body { flex: 1; padding: 15px; overflow-y: auto; background: #f8fafc; display: flex; flex-direction: column; gap: 10px; }
+        .chat-bubble { max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 0.9rem; line-height: 1.4; }
+        .chat-user { background: #0c831f; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .chat-bot { background: #e2e8f0; color: #1e293b; align-self: flex-start; border-bottom-left-radius: 4px; }
+        .chat-footer { padding: 15px; background: white; border-top: 1px solid #e5e7eb; display: flex; gap: 10px; }
+        .chat-footer input { flex: 1; padding: 10px 15px; border: 1px solid #e5e7eb; border-radius: 20px; outline: none; }
+        .chat-footer button { background: #0c831f; color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .chat-footer button:hover { background: #0a6c19; transform: scale(1.05); }
     </style>
 </head>
 <body>
@@ -199,7 +214,7 @@
 <div class="header">
     <div class="header-container">
         <div class="logo"><i class="fas fa-bolt"></i> DronTeen</div>
-        <div class="location"><i class="fas fa-map-marker-alt"></i> Greater Noida • Noida</div>
+        <div class="location"><i class="fas fa-map-marker-alt"></i> Greater Noida - Noida</div>
         <div class="search-bar">
             <input type="text" id="searchInput" placeholder="Search for snacks, drinks, meals...">
             <i class="fas fa-search"></i>
@@ -219,7 +234,7 @@
 <div class="main-container">
     <div class="products-section">
         <div class="products-header">
-            <h2>🔥 Today's Crave</h2>
+            <h2>Today's Crave</h2>
             <select id="sortProducts" class="sort-select">
                 <option value="popularity">Popularity</option>
                 <option value="price-low-high">Price: Low to High</option>
@@ -238,10 +253,10 @@
             <div class="empty-cart"><i class="fas fa-bag-shopping" style="font-size:48px;"></i><p>Cart is empty</p></div>
         </div>
         <div class="cart-summary">
-            <div class="summary-row"><span>Item Total</span><span id="itemTotal">₹0</span></div>
-            <div class="summary-row"><span>Delivery Fee</span><span>₹25</span></div>
-            <div class="summary-row"><span>Platform Fee</span><span>₹2</span></div>
-            <div class="summary-row total-row"><span>Total</span><span id="cartTotalAmount">₹0</span></div>
+            <div class="summary-row"><span>Item Total</span><span id="itemTotal">Rs 0</span></div>
+            <div class="summary-row"><span>Delivery Fee</span><span>Rs 25</span></div>
+            <div class="summary-row"><span>Platform Fee</span><span>Rs 2</span></div>
+            <div class="summary-row total-row"><span>Total</span><span id="cartTotalAmount">Rs 0</span></div>
             <button class="checkout-btn" id="checkoutBtn">Proceed to Checkout</button>
         </div>
     </aside>
@@ -290,7 +305,7 @@
 <!-- Rating Modal -->
 <div id="ratingModal" class="modal" style="z-index: 3000;">
     <div class="modal-content" style="max-width: 400px; text-align: center; padding: 40px 30px;">
-        <h2 style="font-weight: 800; font-size: 1.8rem; color: #0c831f; margin-bottom: 10px;">Order Successful! 🎉</h2>
+        <h2 style="font-weight: 800; font-size: 1.8rem; color: #0c831f; margin-bottom: 10px;">Order Successful!</h2>
         <p style="color: #64748b; margin-bottom: 20px;">How was your experience?</p>
         
         <div class="rating-stars">
@@ -310,6 +325,22 @@
     </div>
 </div>
 
+<!-- Help Me Bot -->
+<div id="botBtn"><i class="fas fa-robot"></i></div>
+<div id="chatWindow">
+    <div class="chat-header">
+        <span><i class="fas fa-robot"></i> DronaTeen AI</span>
+        <i class="fas fa-times" id="closeChat"></i>
+    </div>
+    <div class="chat-body" id="chatBody">
+        <div class="chat-bubble chat-bot">Hi there! I am the DronaTeen Assistant. How can I help you today?</div>
+    </div>
+    <div class="chat-footer">
+        <input type="text" id="chatInput" placeholder="Type your message...">
+        <button id="sendChat"><i class="fas fa-paper-plane"></i></button>
+    </div>
+</div>
+
 <script>
     // ---------- PRODUCTS ----------
     let products = [];
@@ -323,6 +354,8 @@
                     id: p._id,
                     name: p.name,
                     price: p.price,
+                    discountPercent: p.discountPercent || 0,
+                    finalPrice: Math.round((p.price || 0) * (1 - ((p.discountPercent || 0) / 100))),
                     weight: p.weight,
                     image: p.image,
                     popularity: p.popularity || 5,
@@ -374,6 +407,67 @@
         }
 
         setTimeout(() => window.location.href = '/dashboard.html', 1000);
+    });
+
+    // Chatbot Logic
+    const botBtn = document.getElementById('botBtn');
+    const chatWindow = document.getElementById('chatWindow');
+    const closeChat = document.getElementById('closeChat');
+    const sendChat = document.getElementById('sendChat');
+    const chatInput = document.getElementById('chatInput');
+    const chatBody = document.getElementById('chatBody');
+
+    botBtn.addEventListener('click', () => {
+        chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
+    });
+    closeChat.addEventListener('click', () => chatWindow.style.display = 'none');
+
+    async function handleSendChat() {
+        const text = chatInput.value.trim();
+        if (!text) return;
+        
+        // Add User Message
+        const userMsg = document.createElement('div');
+        userMsg.className = 'chat-bubble chat-user';
+        userMsg.textContent = text;
+        chatBody.appendChild(userMsg);
+        chatInput.value = '';
+        chatBody.scrollTop = chatBody.scrollHeight;
+
+        // Loading indicator
+        const loadingMsg = document.createElement('div');
+        loadingMsg.className = 'chat-bubble chat-bot';
+        loadingMsg.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Typing...';
+        chatBody.appendChild(loadingMsg);
+        chatBody.scrollTop = chatBody.scrollHeight;
+
+        try {
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
+            const data = await res.json();
+            
+            chatBody.removeChild(loadingMsg);
+            
+            const botMsg = document.createElement('div');
+            botMsg.className = 'chat-bubble chat-bot';
+            botMsg.textContent = data.success ? data.reply : 'Sorry, I am having trouble connecting right now.';
+            chatBody.appendChild(botMsg);
+        } catch (err) {
+            chatBody.removeChild(loadingMsg);
+            const errMsg = document.createElement('div');
+            errMsg.className = 'chat-bubble chat-bot';
+            errMsg.textContent = 'Network error. Please try again later.';
+            chatBody.appendChild(errMsg);
+        }
+        chatBody.scrollTop = chatBody.scrollHeight;
+    }
+
+    sendChat.addEventListener('click', handleSendChat);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleSendChat();
     });
 
     loadProducts();
@@ -436,8 +530,9 @@
                 <div class="product-info">
                     <div class="product-name">${prod.name}</div>
                     <div class="product-weight">${prod.weight}</div>
-                    <div class="product-price">₹${prod.price}</div>
-                    <button class="add-to-cart" data-id="${prod.id}" data-name="${prod.name}" data-price="${prod.price}" ${isSoldOut ? 'disabled' : ''}>
+                    <div class="product-price">Rs ${prod.finalPrice}</div>
+                    ${prod.discountPercent > 0 ? `<div style="font-size: 12px; color: #64748b; margin-top: -10px; margin-bottom: 10px;"><s>Rs ${prod.price}</s> - ${prod.discountPercent}% OFF</div>` : ''}
+                    <button class="add-to-cart" data-id="${prod.id}" data-name="${prod.name}" data-price="${prod.finalPrice}" ${isSoldOut ? 'disabled' : ''}>
                         <i class="fas ${isSoldOut ? 'fa-times-circle' : 'fa-plus-circle'}"></i> 
                         ${isSoldOut ? 'Sold Out' : 'Add to Cart'}
                     </button>
@@ -453,7 +548,7 @@
                 
                 if (existing) {
                     if (existing.quantity >= prod.stock) {
-                        showToast(`❌ Only ${prod.stock} pieces available`, true);
+                        showToast(`Only ${prod.stock} pieces available`, true);
                         return;
                     }
                     existing.quantity++;
@@ -461,7 +556,7 @@
                     cart.push({ id, name, price, quantity: 1 });
                 }
                 updateCartUI();
-                showToast(`🛒 ${name} added`);
+                showToast(`${name} added`);
             });
         });
     }
@@ -475,7 +570,7 @@
                 const div = document.createElement('div');
                 div.className = 'cart-item';
                 div.innerHTML = `
-                    <div class="cart-item-info"><h4>${item.name}</h4><div class="cart-item-price">₹${item.price}</div></div>
+                    <div class="cart-item-info"><h4>${item.name}</h4><div class="cart-item-price">Rs ${item.price}</div></div>
                     <div class="cart-quantity">
                         <button class="qty-btn minus" data-id="${item.id}">-</button>
                         <span>${item.quantity}</span>
@@ -499,7 +594,7 @@
                     const item = cart.find(i => i.id === id);
                     const prod = products.find(p => p.id === id);
                     if (item.quantity >= prod.stock) {
-                        showToast(`❌ Only ${prod.stock} pieces available`, true);
+                        showToast(`Only ${prod.stock} pieces available`, true);
                         return;
                     }
                     item.quantity++;
@@ -511,8 +606,8 @@
         const totalValue = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
         cartItemCountText.innerText = `(${totalItems} ${totalItems === 1 ? 'item' : 'items'})`;
         cartCountBadge.innerText = totalItems;
-        itemTotalSpan.innerText = `₹${totalValue}`;
-        cartTotalSpan.innerText = `₹${totalValue + 25 + 2}`;
+        itemTotalSpan.innerText = `Rs ${totalValue}`;
+        cartTotalSpan.innerText = `Rs ${totalValue + 25 + 2}`;
         checkoutBtn.disabled = cart.length === 0;
     }
 
@@ -555,7 +650,7 @@
             });
             const data = await response.json();
             if (data.success) {
-                showToast('✅ Order placed successfully!');
+                showToast('Order placed successfully!');
                 cart = [];
                 updateCartUI();
                 paymentModal.style.display = 'none';
@@ -565,10 +660,10 @@
                 ratingModal.style.display = 'flex';
                 ratingModal.dataset.orderId = data._id; // Store order ID
             } else {
-                showToast('❌ Order failed: ' + data.message, true);
+                showToast('Order failed: ' + data.message, true);
             }
         } catch (err) {
-            showToast('❌ Server error. Please try again.', true);
+            showToast('Server error. Please try again.', true);
         }
     }
 
@@ -653,7 +748,7 @@
             });
             localStorage.removeItem('reorderCart');
             updateCartUI();
-            showToast('🔄 Items added from previous order');
+            showToast('Items added from previous order');
         } catch(e) {}
     }
 
@@ -662,3 +757,4 @@
 </script>
 </body>
 </html>
+

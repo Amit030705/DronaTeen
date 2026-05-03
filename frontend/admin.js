@@ -1,4 +1,4 @@
-let token = localStorage.getItem('adminToken');
+﻿let token = localStorage.getItem('adminToken');
 if (!token) window.location.href = '/admin-login.html';
 
 let currentProductId = null;
@@ -50,12 +50,12 @@ async function loadDashboard() {
         document.getElementById('statsGrid').innerHTML = `
             <div class="stat-card"><div class="stat-title">Total Users</div><div class="stat-value">${stats.totalUsers}</div></div>
             <div class="stat-card"><div class="stat-title">Total Orders</div><div class="stat-value">${stats.totalOrders}</div></div>
-            <div class="stat-card"><div class="stat-title">Revenue (₹)</div><div class="stat-value">₹${stats.totalRevenue}</div></div>
+            <div class="stat-card"><div class="stat-title">Revenue (Rs)</div><div class="stat-value">Rs ${stats.totalRevenue}</div></div>
             <div class="stat-card"><div class="stat-title">Products</div><div class="stat-value">${stats.totalProducts}</div></div>
         `;
         let ordersHtml = '<table><tr><th>Order ID</th><th>User</th><th>Total</th><th>Status</th><th>Date</th></tr>';
         data.recentOrders.forEach(o => {
-            ordersHtml += `<tr><td>${o.orderId}</td><td>${o.userId?.name || 'N/A'}</td><td>₹${o.total}</td><td><span class="status-badge status-${o.status}">${o.status}</span></td><td>${new Date(o.createdAt).toLocaleDateString()}</td></tr>`;
+            ordersHtml += `<tr><td>${o.orderId}</td><td>${o.userId?.name || 'N/A'}</td><td>Rs ${o.total}</td><td><span class="status-badge status-${o.status}">${o.status}</span></td><td>${new Date(o.createdAt).toLocaleDateString()}</td></tr>`;
         });
         ordersHtml += ';</table>';
         document.getElementById('recentOrdersTable').innerHTML = ordersHtml;
@@ -113,7 +113,7 @@ window.viewStudent = async (id) => {
 
         let ordersHtml = '<table><thead><tr><th>Order ID</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead><tbody>';
         data.orders.forEach(o => {
-            ordersHtml += `<tr><td>${o.orderId}</td><td>${new Date(o.createdAt).toLocaleDateString()}</td><td>₹${o.total}</td><td><span class="status-badge status-${o.status}">${o.status}</span></td></tr>`;
+            ordersHtml += `<tr><td>${o.orderId}</td><td>${new Date(o.createdAt).toLocaleDateString()}</td><td>Rs ${o.total}</td><td><span class="status-badge status-${o.status}">${o.status}</span></td></tr>`;
         });
         document.getElementById('stDetailOrders').innerHTML = ordersHtml + '</tbody></table>';
     }
@@ -141,9 +141,9 @@ async function loadOrders() {
         let html = '<table><tr><th>Order ID</th><th>User</th><th>Items</th><th>Total</th><th>Status</th><th>Rating / Feedback</th><th>Date</th><th>Actions</th></tr>';
         data.orders.forEach(o => {
             let items = o.items.map(i => `${i.name} x${i.quantity}`).join(', ');
-            let ratingDisplay = o.rating ? '⭐'.repeat(o.rating) : 'N/A';
+            let ratingDisplay = o.rating ? '*'.repeat(o.rating) : 'N/A';
             let feedbackDisplay = o.feedback ? `<br><small style="color:#64748b;">"${o.feedback}"</small>` : '';
-            html += `<tr><td>${o.orderId}</td><td>${o.userId?.name || 'N/A'}</td><td>${items}</td><td>₹${o.total}</td>
+            html += `<tr><td>${o.orderId}</td><td>${o.userId?.name || 'N/A'}</td><td>${items}</td><td>Rs ${o.total}</td>
             <td><select id="status-${o.orderId}" onchange="updateStatus('${o.orderId}', this.value)"><option ${o.status==='pending'?'selected':''}>pending</option><option ${o.status==='confirmed'?'selected':''}>confirmed</option><option ${o.status==='delivered'?'selected':''}>delivered</option></select></td>
             <td>${ratingDisplay}${feedbackDisplay}</td>
             <td>${new Date(o.createdAt).toLocaleDateString()}</td>
@@ -183,6 +183,7 @@ async function loadProducts() {
                             <th>Image</th>
                             <th>Product Details</th>
                             <th>Price</th>
+                            <th>Discount</th>
                             <th>Weight</th>
                             <th>Stock</th>
                             <th>Actions</th>
@@ -202,7 +203,11 @@ async function loadProducts() {
                         <div style="font-size: 11px; color: #64748b; margin-top: 2px;">${p.category || 'General'}</div>
                     </td>
                     <td>
-                        <div style="font-weight: 800; color: #0c831f;">₹${p.price}</div>
+                        <div style="font-weight: 800; color: #0c831f;">Rs ${Math.round((p.price || 0) * (1 - ((p.discountPercent || 0) / 100)))}</div>
+                        ${(p.discountPercent || 0) > 0 ? `<div style="font-size: 11px; color: #64748b;"><s>Rs ${p.price}</s> - ${p.discountPercent}% OFF</div>` : ''}
+                    </td>
+                    <td>
+                        <span class="canteen-badge">${p.discountPercent || 0}%</span>
                     </td>
                     <td>
                         <span class="canteen-badge">${p.weight}</span>
@@ -237,6 +242,7 @@ function editProduct(id) {
         if(prod){
             document.getElementById('prodName').value = prod.name;
             document.getElementById('prodPrice').value = prod.price;
+            document.getElementById('prodDiscount').value = prod.discountPercent || 0;
             document.getElementById('prodWeight').value = prod.weight;
             document.getElementById('prodImage').value = prod.image;
             document.getElementById('prodPopularity').value = prod.popularity;
@@ -249,7 +255,18 @@ window.deleteProduct = async (id) => {
     const ok = await showConfirm('Delete Product', 'Remove this item from the menu?', 'Delete Item');
     if(ok){ await fetchAPI(`/api/admin/products/${id}`, { method: 'DELETE' }); loadProducts(); showToast('Product removed'); } 
 };
-document.getElementById('addProductBtn').onclick = () => { currentProductId = null; document.getElementById('modalTitle').innerText = 'Add Product'; document.getElementById('productModal').style.display = 'flex'; };
+document.getElementById('addProductBtn').onclick = () => {
+    currentProductId = null;
+    document.getElementById('modalTitle').innerText = 'Add Product';
+    document.getElementById('productModal').style.display = 'flex';
+    document.getElementById('prodName').value = '';
+    document.getElementById('prodPrice').value = '';
+    document.getElementById('prodDiscount').value = 0;
+    document.getElementById('prodWeight').value = '';
+    document.getElementById('prodImage').value = '';
+    document.getElementById('prodPopularity').value = '';
+    document.getElementById('prodStock').value = 0;
+};
 // Support Tickets
 async function loadSupportTickets() {
     const data = await fetchAPI('/api/admin/support');
@@ -280,9 +297,11 @@ window.resolveTicket = async (id) => {
 };
 
 document.getElementById('saveProductBtn').onclick = async () => {
+    const discountPercent = Math.max(0, Math.min(100, parseInt(document.getElementById('prodDiscount').value, 10) || 0));
     const product = {
         name: document.getElementById('prodName').value,
         price: parseInt(document.getElementById('prodPrice').value),
+        discountPercent,
         weight: document.getElementById('prodWeight').value,
         image: document.getElementById('prodImage').value,
         popularity: parseInt(document.getElementById('prodPopularity').value) || 0,
