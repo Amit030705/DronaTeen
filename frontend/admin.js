@@ -227,5 +227,23 @@ document.querySelectorAll('.nav-item[data-section]').forEach(item => {
         if(section === 'dashboard') loadDashboard();
     });
 });
-document.getElementById('logoutAdmin').addEventListener('click', () => { localStorage.removeItem('adminToken'); window.location.href = '/admin-login.html'; });
+
+// Global Modal Close logic
+document.getElementById('closeStudentModal').onclick = () => { document.getElementById('studentModal').style.display = 'none'; };
+document.querySelector('#productModal .close').onclick = () => { document.getElementById('productModal').style.display = 'none'; };
+
+window.onclick = (event) => {
+    const studentModal = document.getElementById('studentModal');
+    const productModal = document.getElementById('productModal');
+    const confirmModal = document.getElementById('confirmModal');
+    if (event.target == studentModal) studentModal.style.display = 'none';
+    if (event.target == productModal) productModal.style.display = 'none';
+    if (event.target == confirmModal) confirmModal.style.display = 'none';
+};
+
+document.getElementById('logoutAdmin').addEventListener('click', () => { 
+    localStorage.removeItem('adminToken'); 
+    window.location.href = '/admin-login.html'; 
+});
+
 loadDashboard();
