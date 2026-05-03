@@ -76,6 +76,30 @@ const productSchema = new mongoose.Schema({
 const User = mongoose.model('User', userSchema);
 const Order = mongoose.model('Order', orderSchema);
 const Transaction = mongoose.model('Transaction', transactionSchema);
+
+// Admin Seeding
+async function seedAdmin() {
+    try {
+        const email = 'DA@gmail.com';
+        const existing = await User.findOne({ email });
+        if (!existing) {
+            const hashedPassword = await bcrypt.hash('DjAk1403@', 10);
+            await User.create({
+                name: 'DronaTeen Admin',
+                email: email,
+                password: hashedPassword,
+                role: 'admin',
+                canteenId: 'ADMIN01'
+            });
+            console.log('✅ Admin user seeded: DA@gmail.com');
+        } else if (existing.role !== 'admin') {
+            existing.role = 'admin';
+            await existing.save();
+            console.log('✅ User promoted to Admin');
+        }
+    } catch (err) { console.error('Admin seeding failed:', err); }
+}
+seedAdmin();
 const Product = mongoose.model('Product', productSchema);
 
 // ======================== EMAIL ========================
