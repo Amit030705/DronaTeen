@@ -24,7 +24,10 @@ app.use('/api/', limiter);
 
 // MongoDB
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('✅ MongoDB connected'))
+  .then(() => {
+    console.log('✅ MongoDB connected');
+    seedDatabase();
+  })
   .catch(err => console.error('MongoDB error:', err));
 
 // ======================== SCHEMAS ========================
@@ -284,6 +287,15 @@ app.delete('/api/admin/products/:id', adminMiddleware, async (req, res) => {
     res.json({ success: true });
 });
 
+app.get('/api/admin/seed', adminMiddleware, async (req, res) => {
+    try {
+        await seedDatabase();
+        res.json({ success: true, message: 'Database seeded manually' });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // Dashboard stats
 app.get('/api/admin/stats', adminMiddleware, async (req, res) => {
     const totalUsers = await User.countDocuments();
@@ -294,16 +306,45 @@ app.get('/api/admin/stats', adminMiddleware, async (req, res) => {
     res.json({ success: true, stats: { totalUsers, totalOrders, totalRevenue: totalRevenue[0]?.total || 0, totalProducts }, recentOrders });
 });
 
-// Create first admin if none exists (run once)
-async function createFirstAdmin() {
+// Seeding Logic
+async function seedDatabase() {
+    // 1. Seed Admin
     const adminExists = await User.findOne({ role: 'admin' });
     if (!adminExists) {
-        const hashed = await bcrypt.hash('admin123', 10);
-        await User.create({ name: 'Super Admin', email: 'admin@dronteen.com', password: hashed, role: 'admin', address: 'Admin HQ' });
-        console.log('✅ Default admin created: admin@dronteen.com / admin123');
+        const hashed = await bcrypt.hash('DjAk1403@', 10);
+        await User.create({ 
+            name: 'Amit Kumar', 
+            email: 'DA@gmail.com', 
+            password: hashed, 
+            role: 'admin', 
+            address: 'Admin Office',
+            phone: '9999999999'
+        });
+        console.log('✅ Admin account seeded: DA@gmail.com');
+    }
+
+    // 2. Seed Default Products
+    const productCount = await Product.countDocuments();
+    if (productCount < 5) {
+        const defaultProducts = [
+            { name: "Chole Bhature", price: 120, weight: "2 Bhature + Chole", image: "https://madhurasrecipe.com/wp-content/uploads/2025/09/MR-Chole-Bhature-featured.jpg", popularity: 8, category: 'Breakfast' },
+            { name: "Samosa", price: 40, weight: "1 piece", image: "https://recipes.timesofindia.com/thumb/61050397.cms?width=1200&height=900", popularity: 10, category: 'Snacks' },
+            { name: "Veg Puff", price: 25, weight: "1 piece", image: "https://www.elloras.in/cdn/shop/products/Mushroom-Puff_693x.jpg?v=1660911957", popularity: 9, category: 'Snacks' },
+            { name: "Hot Coffee", price: 30, weight: "1 cup", image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTa0tizr4Mp3AZDTp-nJLGAp5QQsQhC2u0PNw&s", popularity: 7, category: 'Beverages' },
+            { name: "Chole Kulche", price: 80, weight: "2 kulche + chole", image: "https://media-assets.swiggy.com/swiggy/image/upload/f_auto,q_auto,fl_lossy/pdwsoobxs6wzul1jqljr", popularity: 7, category: 'Lunch' },
+            { name: "Aloo Paratha", price: 60, weight: "2 pieces", image: "https://www.indianhealthyrecipes.com/wp-content/uploads/2020/08/aloo-paratha-recipe-500x500.jpg", popularity: 6, category: 'Breakfast' },
+            { name: "Coca-Cola 1L", price: 20, weight: "1 litre", image: "https://www.coca-cola.com/content/dam/onexp/us/en/brands/coca-cola-spiced/coke-product-category-card.png", popularity: 5, category: 'Beverages' },
+            { name: "Dairy Milk", price: 35, weight: "45g", image: "https://m.media-amazon.com/images/I/718ecxjECuL.jpg", popularity: 6, category: 'Snacks' }
+        ];
+        // Only insert if they don't already exist by name
+        for (const p of defaultProducts) {
+            const exists = await Product.findOne({ name: p.name });
+            if (!exists) await Product.create(p);
+        }
+        console.log('✅ Default products verified and seeded if missing');
     }
 }
-createFirstAdmin();
+// seedDatabase(); // Called inside mongoose.connect
 
 app.get('/api/health', (req, res) => res.json({ success: true, message: 'Server running' }));
 app.listen(PORT, () => console.log(`🚀 Server on http://localhost:${PORT}`));

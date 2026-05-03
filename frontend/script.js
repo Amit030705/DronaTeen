@@ -1,17 +1,29 @@
 // Check authentication – redirect to login if no token
 if (!localStorage.getItem('droneToken')) window.location.href = '/login.html';
 
-// Products data (same as before)
-let products = [
-    { id: "1", name: "CholeBhature", price: 120, weight: "2 Bhature and chole", image: "https://madhurasrecipe.com/wp-content/uploads/2025/09/MR-Chole-Bhature-featured.jpg", popularity: 8 },
-    { id: "2", name: "Samosa", price: 40, weight: "1 piece", image: "https://recipes.timesofindia.com/thumb/61050397.cms?width=1200&height=900", popularity: 10 },
-    { id: "3", name: "Patties", price: 25, weight: "1 piece", image: "https://www.elloras.in/cdn/shop/products/Mushroom-Puff_693x.jpg?v=1660911957", popularity: 9 },
-    { id: "4", name: "Coffee", price: 30, weight: "1 piece", image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTa0tizr4Mp3AZDTp-nJLGAp5QQsQhC2u0PNw&s", popularity: 7 },
-    { id: "5", name: "CholeKulche", price: 80, weight: "2 kulche and chole", image: "https://media-assets.swiggy.com/swiggy/image/upload/f_auto,q_auto,fl_lossy/pdwsoobxs6wzul1jqljr", popularity: 7 },
-    { id: "6", name: "AlooParantha", price: 60, weight: "2 paranthe", image: "https://www.indianhealthyrecipes.com/wp-content/uploads/2020/08/aloo-paratha-recipe-500x500.jpg", popularity: 6 },
-    { id: "7", name: "CocaCola", price: 20, weight: "1 litre", image: "https://www.coca-cola.com/content/dam/onexp/us/en/brands/coca-cola-spiced/coke-product-category-card.png", popularity: 5 },
-    { id: "8", name: "Chocolate", price: 35, weight: "1 piece", image: "https://m.media-amazon.com/images/I/718ecxjECuL.jpg", popularity: 6 }
-];
+let products = [];
+
+async function loadProductsFromAPI() {
+    try {
+        const res = await fetch('/api/products');
+        const data = await res.json();
+        if (data.success) {
+            products = data.products.map(p => ({
+                id: p._id,
+                name: p.name,
+                price: p.price,
+                weight: p.weight,
+                image: p.image,
+                popularity: p.popularity || 5,
+                category: p.category
+            }));
+            sortProductsAndRender();
+        }
+    } catch (err) {
+        console.error('Error loading products:', err);
+    }
+}
+loadProductsFromAPI();
 
 let cart = [];
 const productsGrid = document.getElementById('products-grid');
