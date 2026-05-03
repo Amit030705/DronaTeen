@@ -138,11 +138,14 @@ window.deleteUser = async (id) => {
 async function loadOrders() {
     const data = await fetchAPI('/api/admin/orders');
     if (data.success) {
-        let html = '<table><tr><th>Order ID</th><th>User</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th><th>Actions</th></tr>';
+        let html = '<table><tr><th>Order ID</th><th>User</th><th>Items</th><th>Total</th><th>Status</th><th>Rating / Feedback</th><th>Date</th><th>Actions</th></tr>';
         data.orders.forEach(o => {
             let items = o.items.map(i => `${i.name} x${i.quantity}`).join(', ');
+            let ratingDisplay = o.rating ? '⭐'.repeat(o.rating) : 'N/A';
+            let feedbackDisplay = o.feedback ? `<br><small style="color:#64748b;">"${o.feedback}"</small>` : '';
             html += `<tr><td>${o.orderId}</td><td>${o.userId?.name || 'N/A'}</td><td>${items}</td><td>₹${o.total}</td>
             <td><select id="status-${o.orderId}" onchange="updateStatus('${o.orderId}', this.value)"><option ${o.status==='pending'?'selected':''}>pending</option><option ${o.status==='confirmed'?'selected':''}>confirmed</option><option ${o.status==='delivered'?'selected':''}>delivered</option></select></td>
+            <td>${ratingDisplay}${feedbackDisplay}</td>
             <td>${new Date(o.createdAt).toLocaleDateString()}</td>
             <td><button onclick="deleteOrder('${o.orderId}')">Delete</button></td></tr>`;
         });

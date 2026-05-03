@@ -42,6 +42,8 @@ const orderSchema = new mongoose.Schema({
     paymentMethod: String,
     paymentId: String,
     status: { type: String, default: 'pending' },
+    rating: { type: Number, min: 1, max: 5 },
+    feedback: String,
     createdAt: { type: Date, default: Date.now }
 });
 const userSchema = new mongoose.Schema({
@@ -256,7 +258,23 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
         await new Transaction({ userId: req.userId, orderId, amount: total, type: 'purchase', paymentId }).save();
         sendAdminAlert('New Order Placed', user, req, { orderAmount: total });
         
-        res.status(201).json({ success: true, orderId });
+        res.status(201).json({ success: true, orderId, _id: order._id });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Order Rating
+app.put('/api/orders/:id/rate', authMiddleware, async (req, res) => {
+    try {
+        const { rating, feedback } = req.body;
+        const order = await Order.findOneAndUpdate(
+            { _id: req.params.id, userId: req.userId },
+            { rating, feedback },
+            { new: true }
+        );
+        if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+        res.json({ success: true, order });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }

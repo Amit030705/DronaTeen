@@ -177,6 +177,21 @@
             z-index: 10;
             backdrop-filter: blur(2px);
         }
+
+        /* Rating Modal Styles */
+        .rating-stars { display: flex; justify-content: center; gap: 10px; margin: 20px 0; flex-direction: row-reverse; }
+        .rating-stars input { display: none; }
+        .rating-stars label { font-size: 2.5rem; color: #cbd5e1; cursor: pointer; transition: 0.2s; }
+        .rating-stars label:hover, .rating-stars label:hover ~ label, .rating-stars input:checked ~ label { color: #f59e0b; }
+        #ratingFeedback { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid #e5e7eb; margin-bottom: 20px; resize: vertical; background: #f8fafc; font-family: inherit; }
+        }
+
+        /* Rating Modal Styles */
+        .rating-stars { display: flex; justify-content: center; gap: 10px; margin: 20px 0; flex-direction: row-reverse; }
+        .rating-stars input { display: none; }
+        .rating-stars label { font-size: 2.5rem; color: #cbd5e1; cursor: pointer; transition: 0.2s; }
+        .rating-stars label:hover, .rating-stars label:hover ~ label, .rating-stars input:checked ~ label, .rating-stars input:checked ~ label ~ label { color: #f59e0b; }
+        #ratingFeedback { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid #e5e7eb; margin-bottom: 20px; resize: vertical; background: #f8fafc; font-family: inherit; }
     </style>
 </head>
 <body>
@@ -272,6 +287,29 @@
     </div>
 </div>
 
+<!-- Rating Modal -->
+<div id="ratingModal" class="modal" style="z-index: 3000;">
+    <div class="modal-content" style="max-width: 400px; text-align: center; padding: 40px 30px;">
+        <h2 style="font-weight: 800; font-size: 1.8rem; color: #0c831f; margin-bottom: 10px;">Order Successful! 🎉</h2>
+        <p style="color: #64748b; margin-bottom: 20px;">How was your experience?</p>
+        
+        <div class="rating-stars">
+            <input type="radio" name="rating" id="star5" value="5"><label for="star5" class="fas fa-star"></label>
+            <input type="radio" name="rating" id="star4" value="4"><label for="star4" class="fas fa-star"></label>
+            <input type="radio" name="rating" id="star3" value="3"><label for="star3" class="fas fa-star"></label>
+            <input type="radio" name="rating" id="star2" value="2"><label for="star2" class="fas fa-star"></label>
+            <input type="radio" name="rating" id="star1" value="1"><label for="star1" class="fas fa-star"></label>
+        </div>
+        
+        <textarea id="ratingFeedback" rows="3" placeholder="Tell us what you liked or how we can improve..."></textarea>
+        
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button id="skipRatingBtn" class="btn-cancel-logout" style="flex: 1;">Skip</button>
+            <button id="submitRatingBtn" class="pay-btn" style="flex: 2; margin-top: 0;">Submit Feedback</button>
+        </div>
+    </div>
+</div>
+
 <script>
     // ---------- PRODUCTS ----------
     let products = [];
@@ -297,6 +335,47 @@
             console.error('Error loading products:', err);
         }
     }
+
+    // Rating Modal Logic
+    const ratingModal = document.getElementById('ratingModal');
+    const skipRatingBtn = document.getElementById('skipRatingBtn');
+    const submitRatingBtn = document.getElementById('submitRatingBtn');
+
+    skipRatingBtn.addEventListener('click', () => {
+        ratingModal.style.display = 'none';
+        window.location.href = '/dashboard.html';
+    });
+
+    submitRatingBtn.addEventListener('click', async () => {
+        const orderId = ratingModal.dataset.orderId;
+        const ratingInput = document.querySelector('input[name="rating"]:checked');
+        const feedback = document.getElementById('ratingFeedback').value;
+        
+        if (!ratingInput) {
+            showToast('Please select a star rating', true);
+            return;
+        }
+
+        submitRatingBtn.disabled = true;
+        submitRatingBtn.innerHTML = 'Submitting...';
+
+        try {
+            const res = await fetch(`/api/orders/${orderId}/rate`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ rating: parseInt(ratingInput.value), feedback })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('Thanks for your feedback!');
+            }
+        } catch (err) {
+            console.error('Rating error:', err);
+        }
+
+        setTimeout(() => window.location.href = '/dashboard.html', 1000);
+    });
+
     loadProducts();
 
     let cart = [];
@@ -476,11 +555,15 @@
             });
             const data = await response.json();
             if (data.success) {
-                showToast('✅ Order placed successfully! Redirecting...');
+                showToast('✅ Order placed successfully!');
                 cart = [];
                 updateCartUI();
                 paymentModal.style.display = 'none';
-                setTimeout(() => window.location.href = '/dashboard.html', 1500);
+                
+                // Show Rating Modal
+                const ratingModal = document.getElementById('ratingModal');
+                ratingModal.style.display = 'flex';
+                ratingModal.dataset.orderId = data._id; // Store order ID
             } else {
                 showToast('❌ Order failed: ' + data.message, true);
             }
