@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -402,12 +403,17 @@
             document.getElementById('txnTableBody').innerHTML = tbody || '<tr><td colspan="5">No transactions</td></tr>';
         }
     }
-    window.downloadReceiptFromLedger = (payload) => {
+    window.downloadReceiptFromLedger = async (payload) => {
         const txn = JSON.parse(decodeURIComponent(payload));
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         const userName = document.getElementById('userName')?.innerText || 'Student';
         const userEmail = document.getElementById('userEmail')?.innerText || '';
+        const verifyUrl = `${window.location.origin}/api/receipts/${encodeURIComponent(txn.receiptNumber)}/verify`;
+        let qrDataUrl = '';
+        try {
+            qrDataUrl = await window.QRCode.toDataURL(verifyUrl, { width: 180, margin: 1 });
+        } catch (e) {}
 
         doc.setFontSize(18);
         doc.text('DronTeen Payment Receipt', 14, 20);
@@ -420,7 +426,12 @@
         doc.text(`Type: ${txn.type}`, 14, 72);
         doc.text(`Amount: Rs ${txn.amount}`, 14, 80);
         doc.text(`Payment ID: ${txn.paymentId || 'N/A'}`, 14, 88);
-        doc.text('Thank you for using DronTeen.', 14, 102);
+        doc.text(`Verify: ${verifyUrl}`, 14, 96);
+        if (qrDataUrl) {
+            doc.addImage(qrDataUrl, 'PNG', 150, 20, 40, 40);
+            doc.text('Scan to verify', 150, 64);
+        }
+        doc.text('Thank you for using DronTeen.', 14, 112);
 
         doc.save(`Receipt-${txn.receiptNumber}.pdf`);
     };

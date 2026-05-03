@@ -150,10 +150,15 @@ window.viewStudent = async (id) => {
         document.getElementById('stDetailTransactions').innerHTML = txHtml + '</tbody></table>';
     }
 };
-window.downloadStudentReceipt = (payload) => {
+window.downloadStudentReceipt = async (payload) => {
     const txn = JSON.parse(decodeURIComponent(payload));
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
+    const verifyUrl = `${window.location.origin}/api/receipts/${encodeURIComponent(txn.receiptNumber)}/verify`;
+    let qrDataUrl = '';
+    try {
+        qrDataUrl = await window.QRCode.toDataURL(verifyUrl, { width: 180, margin: 1 });
+    } catch (e) {}
     doc.setFontSize(18);
     doc.text('DronTeen Payment Receipt', 14, 20);
     doc.setFontSize(11);
@@ -165,7 +170,12 @@ window.downloadStudentReceipt = (payload) => {
     doc.text(`Type: ${txn.type}`, 14, 72);
     doc.text(`Amount: Rs ${txn.amount}`, 14, 80);
     doc.text(`Payment ID: ${txn.paymentId || 'N/A'}`, 14, 88);
-    doc.text('Generated from Admin Panel', 14, 102);
+    doc.text(`Verify: ${verifyUrl}`, 14, 96);
+    if (qrDataUrl) {
+        doc.addImage(qrDataUrl, 'PNG', 150, 20, 40, 40);
+        doc.text('Scan to verify', 150, 64);
+    }
+    doc.text('Generated from Admin Panel', 14, 112);
     doc.save(`Receipt-${txn.receiptNumber}.pdf`);
 };
 window.toggleAdmin = async (id, currentRole) => {

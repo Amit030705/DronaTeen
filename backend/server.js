@@ -328,6 +328,29 @@ app.get('/api/user/transactions', authMiddleware, async (req, res) => {
     const transactions = await Transaction.find({ userId: req.userId }).sort({ createdAt: -1 });
     res.json({ success: true, transactions });
 });
+app.get('/api/receipts/:receiptNumber/verify', async (req, res) => {
+    try {
+        const txn = await Transaction.findOne({ receiptNumber: req.params.receiptNumber }).populate('userId', 'name email');
+        if (!txn) {
+            return res.status(404).json({ success: false, valid: false, message: 'Receipt not found' });
+        }
+        res.json({
+            success: true,
+            valid: true,
+            receipt: {
+                receiptNumber: txn.receiptNumber,
+                orderId: txn.orderId,
+                amount: txn.amount,
+                type: txn.type,
+                paymentId: txn.paymentId,
+                createdAt: txn.createdAt,
+                user: txn.userId ? { name: txn.userId.name, email: txn.userId.email } : null
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, valid: false, message: err.message });
+    }
+});
 app.post('/api/orders', authMiddleware, async (req, res) => {
     try {
         const { items, total, paymentMethod, paymentId } = req.body;
