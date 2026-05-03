@@ -247,6 +247,35 @@ window.deleteProduct = async (id) => {
     if(ok){ await fetchAPI(`/api/admin/products/${id}`, { method: 'DELETE' }); loadProducts(); showToast('Product removed'); } 
 };
 document.getElementById('addProductBtn').onclick = () => { currentProductId = null; document.getElementById('modalTitle').innerText = 'Add Product'; document.getElementById('productModal').style.display = 'flex'; };
+// Support Tickets
+async function loadSupportTickets() {
+    const data = await fetchAPI('/api/admin/support');
+    if (data.success) {
+        let html = '<table><thead><tr><th>Ticket ID</th><th>User</th><th>Subject / Message</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody>';
+        data.tickets.forEach(t => {
+            html += `<tr>
+                <td><small>${t._id.substring(18)}</small><br><span style="font-size:10px;color:#64748b;">${t.orderId || ''}</span></td>
+                <td><strong>${t.userId?.name || 'N/A'}</strong><br><small>${t.userId?.email || ''}</small></td>
+                <td><strong>${t.subject}</strong><br><small style="color:#475569;">${t.message}</small></td>
+                <td><span class="status-badge status-${t.status === 'resolved' ? 'confirmed' : 'pending'}">${t.status}</span></td>
+                <td>${new Date(t.createdAt).toLocaleDateString()}</td>
+                <td>
+                    ${t.status === 'pending' ? `<button onclick="resolveTicket('${t._id}')" style="background:#0c831f;"><i class="fas fa-check"></i> Resolve</button>` : `<span style="color:#10b981;font-weight:bold;"><i class="fas fa-check-double"></i> Done</span>`}
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('adminSupportTable').innerHTML = html;
+    }
+}
+window.resolveTicket = async (id) => {
+    const res = await fetchAPI(`/api/admin/support/${id}`, { method: 'PUT', body: JSON.stringify({ status: 'resolved' }) });
+    if (res.success) {
+        showToast('Ticket resolved');
+        loadSupportTickets();
+    }
+};
+
 document.getElementById('saveProductBtn').onclick = async () => {
     const product = {
         name: document.getElementById('prodName').value,
@@ -287,11 +316,13 @@ document.querySelectorAll('.nav-item[data-section]').forEach(item => {
         document.getElementById('usersSection').style.display = section === 'users' ? 'block' : 'none';
         document.getElementById('ordersSection').style.display = section === 'orders' ? 'block' : 'none';
         document.getElementById('productsSection').style.display = section === 'products' ? 'block' : 'none';
+        document.getElementById('supportSection').style.display = section === 'support' ? 'block' : 'none';
         document.getElementById('settingsSection').style.display = section === 'settings' ? 'block' : 'none';
         
         if(section === 'users') loadUsers();
         if(section === 'orders') loadOrders();
         if(section === 'products') loadProducts();
+        if(section === 'support') loadSupportTickets();
         if(section === 'dashboard') loadDashboard();
         if(section === 'settings') loadAdminSettings();
     });

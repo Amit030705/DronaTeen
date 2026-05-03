@@ -78,9 +78,19 @@ const productSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
+const supportTicketSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    subject: { type: String, required: true },
+    orderId: { type: String, default: '' },
+    message: { type: String, required: true },
+    status: { type: String, enum: ['pending', 'resolved'], default: 'pending' },
+    createdAt: { type: Date, default: Date.now }
+});
+
 const User = mongoose.model('User', userSchema);
 const Order = mongoose.model('Order', orderSchema);
 const Transaction = mongoose.model('Transaction', transactionSchema);
+const SupportTicket = mongoose.model('SupportTicket', supportTicketSchema);
 
 // Admin Seeding
 async function seedAdmin() {
@@ -252,6 +262,32 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
     }
 });
 
+// Support Tickets (User)
+app.post('/api/support', authMiddleware, async (req, res) => {
+    try {
+        const { subject, orderId, message } = req.body;
+        const user = await User.findById(req.userId);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        
+        const ticket = new SupportTicket({ userId: req.userId, subject, orderId, message });
+        await ticket.save();
+        
+        sendAdminAlert('New Support Ticket', user, req, { message: `Subject: ${subject}<br>Order ID: ${orderId || 'N/A'}<br>Message: ${message}` });
+        
+        res.status(201).json({ success: true, ticket });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+app.get('/api/support', authMiddleware, async (req, res) => {
+    try {
+        const tickets = await SupportTicket.find({ userId: req.userId }).sort({ createdAt: -1 });
+        res.json({ success: true, tickets });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // ======================== ADMIN ROUTES ========================
 // Get all users
 app.get('/api/admin/users', adminMiddleware, async (req, res) => {
@@ -310,6 +346,25 @@ app.put('/api/admin/products/:id', adminMiddleware, async (req, res) => {
 app.delete('/api/admin/products/:id', adminMiddleware, async (req, res) => {
     await Product.findByIdAndDelete(req.params.id);
     res.json({ success: true });
+});
+
+// Support Tickets Management
+app.get('/api/admin/support', adminMiddleware, async (req, res) => {
+    try {
+        const tickets = await SupportTicket.find().populate('userId', 'name email phone').sort({ createdAt: -1 });
+        res.json({ success: true, tickets });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+app.put('/api/admin/support/:id', adminMiddleware, async (req, res) => {
+    try {
+        const { status } = req.body;
+        const ticket = await SupportTicket.findByIdAndUpdate(req.params.id, { status }, { new: true });
+        res.json({ success: true, ticket });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 app.get('/api/admin/seed', adminMiddleware, async (req, res) => {

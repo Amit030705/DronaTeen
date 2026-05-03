@@ -16,6 +16,7 @@
         <div class="nav-item" data-tab="profile"><i class="fas fa-user-graduate"></i><span>Student Profile</span></div>
         <div class="nav-item" data-tab="orders"><i class="fas fa-shopping-bag"></i><span>My Orders</span></div>
         <div class="nav-item" data-tab="transactions"><i class="fas fa-exchange-alt"></i><span>Transactions</span></div>
+        <div class="nav-item" data-tab="support"><i class="fas fa-life-ring"></i><span>Help & Support</span></div>
         <div class="nav-item" data-tab="settings"><i class="fas fa-user-cog"></i><span>Settings</span></div>
         <div class="nav-item" id="shopNowBtn"><i class="fas fa-store"></i><span>Shop Now</span></div>
         <div class="nav-item" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Logout</span></div>
@@ -134,6 +135,47 @@
                 </form>
             </div>
         </div>
+
+        <div id="supportSection" style="display:none;">
+            <div class="glass-card">
+                <div class="section-title">
+                    <span><i class="fas fa-life-ring" style="color:#0c831f; margin-right:10px;"></i> Help & Support</span>
+                </div>
+                <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 20px;">Having trouble with an order or payment? Fill out the form below and our team will get back to you shortly.</p>
+                
+                <form id="supportForm" class="settings-form">
+                    <div class="form-group">
+                        <label>Subject</label>
+                        <select id="supportSubject" required style="padding: 14px 20px; border-radius: 16px; border: 1px solid #e5e7eb; background: #f9fafb;">
+                            <option value="">Select an issue...</option>
+                            <option value="Payment Stuck">Payment Stuck / Failed</option>
+                            <option value="Missing Item">Missing Item in Order</option>
+                            <option value="Wrong Item Delivered">Wrong Item Delivered</option>
+                            <option value="Other">Other Issue</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Order ID (Optional)</label>
+                        <input type="text" id="supportOrderId" placeholder="e.g. ORD123456789">
+                    </div>
+                    <div class="form-group">
+                        <label>Message</label>
+                        <textarea id="supportMessage" required rows="4" placeholder="Describe your issue in detail..." style="padding: 14px 20px; border-radius: 16px; border: 1px solid #e5e7eb; background: #f9fafb; resize: vertical;"></textarea>
+                    </div>
+                    <button type="submit" class="save-btn" id="submitSupportBtn">
+                        <i class="fas fa-paper-plane"></i> Submit Ticket
+                    </button>
+                </form>
+            </div>
+
+            <div class="glass-card" style="margin-top: 30px;">
+                <div class="section-title">🕒 My Support Tickets</div>
+                <table class="modern-table">
+                    <thead><tr><th>Ticket ID</th><th>Date</th><th>Subject</th><th>Status</th></tr></thead>
+                    <tbody id="supportTicketsList"></tbody>
+                </table>
+            </div>
+        </div>
     </main>
 </div>
 
@@ -235,7 +277,26 @@
                 renderProfileTransactions(orders);
                 renderMonthlyChart(orders);
             }
+            
+            const supportRes = await fetchAPI('/api/support');
+            if (supportRes.success) {
+                renderSupportTickets(supportRes.tickets);
+            }
         } catch (e) { console.error('Refresh Error:', e); }
+    }
+
+    function renderSupportTickets(tickets) {
+        let tbody = '';
+        tickets.forEach(t => {
+            const statusColor = t.status === 'resolved' ? '#10b981' : '#f59e0b';
+            tbody += `<tr>
+                <td><small>${t._id.substring(18)}</small></td>
+                <td>${new Date(t.createdAt).toLocaleDateString()}</td>
+                <td>${t.subject}</td>
+                <td><span style="background:${statusColor}20; color:${statusColor}; padding:4px 8px; border-radius:8px; font-size:12px; font-weight:bold; text-transform:uppercase;">${t.status}</span></td>
+            </tr>`;
+        });
+        document.getElementById('supportTicketsList').innerHTML = tbody || '<tr><td colspan="4">No support tickets found</td></tr>';
     }
 
     function renderPurchaseHistory(orders) {
@@ -336,15 +397,45 @@
             showToast('Update failed: ' + res.message, true);
         }
     });
+    
+    document.getElementById('supportForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('submitSupportBtn');
+        btn.disabled = true;
+        btn.innerHTML = 'Submitting...';
+        
+        const payload = {
+            subject: document.getElementById('supportSubject').value,
+            orderId: document.getElementById('supportOrderId').value,
+            message: document.getElementById('supportMessage').value
+        };
+        
+        try {
+            const res = await fetchAPI('/api/support', { method: 'POST', body: JSON.stringify(payload) });
+            if (res.success) {
+                showToast('Support ticket submitted! We will contact you soon.');
+                document.getElementById('supportForm').reset();
+                refreshUserData();
+            } else {
+                showToast('Failed to submit ticket: ' + res.message, true);
+            }
+        } catch (err) {
+            showToast('Error submitting ticket.', true);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Ticket';
+        }
+    });
+
     const tabs = document.querySelectorAll('.nav-item[data-tab]');
-    const sections = { overview: 'overviewSection', profile: 'profileSection', orders: 'ordersSection', transactions: 'transactionsSection', settings: 'settingsSection' };
+    const sections = { overview: 'overviewSection', profile: 'profileSection', orders: 'ordersSection', transactions: 'transactionsSection', support: 'supportSection', settings: 'settingsSection' };
     tabs.forEach(tab => tab.addEventListener('click', () => { 
         Object.values(sections).forEach(sec => document.getElementById(sec).style.display = 'none'); 
         const target = tab.getAttribute('data-tab');
         document.getElementById(sections[target]).style.display = 'block'; 
         tabs.forEach(t=>t.classList.remove('active')); 
         tab.classList.add('active'); 
-        if (target === 'profile' || target === 'overview') refreshUserData();
+        if (target === 'profile' || target === 'overview' || target === 'support') refreshUserData();
     }));
 
     document.getElementById('photoUpload').addEventListener('change', function(e) {
