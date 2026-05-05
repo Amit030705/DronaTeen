@@ -1,4 +1,4 @@
-﻿let token = localStorage.getItem('adminToken');
+let token = localStorage.getItem('adminToken');
 if (!token) window.location.href = '/admin-login.html';
 
 let currentProductId = null;
@@ -227,6 +227,111 @@ window.deleteOrder = async (orderId) => {
     if(ok){ await fetchAPI(`/api/admin/orders/${orderId}`, { method: 'DELETE' }); loadOrders(); showToast('Order deleted'); }
 };
 
+// Timer Orders
+async function loadTimerOrders() {
+    const data = await fetchAPI('/api/admin/orders');
+    if (data.success) {
+        const timerOrders = data.orders.filter(o => o.isTimerOrder && o.status === 'pending');
+        if (timerOrders.length === 0) {
+            document.getElementById('timerOrdersTable').innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #64748b;">
+                    <i class="fas fa-history" style="font-size: 40px; margin-bottom: 10px; opacity: 0.3;"></i>
+                    <p>No pending timer orders at the moment.</p>
+                </div>`;
+            return;
+        }
+
+        let html = '<table><thead><tr><th>Order ID</th><th>User</th><th>Items</th><th>Scheduled Time</th><th>Time Remaining</th><th>Actions</th></tr></thead><tbody>';
+        timerOrders.forEach(o => {
+            const items = o.items.map(i => `${i.name} x${i.quantity}`).join(', ');
+            const createdAt = new Date(o.createdAt).getTime();
+            const now = Date.now();
+            const elapsed = Math.floor((now - createdAt) / 1000);
+            const remaining = Math.max(0, 115 - elapsed);
+            
+            html += `<tr>
+                <td><strong>${o.orderId}</strong></td>
+                <td>${o.userId?.name || 'N/A'}</td>
+                <td>${items}</td>
+                <td><span class="canteen-badge" style="background:#fff7ed; color:#c2410c;">${o.scheduledTime || 'N/A'}</span></td>
+                <td><span id="timer-${o.orderId}" style="color:${remaining < 20 ? '#ef4444' : '#f59e0b'}; font-weight:bold;">${remaining}s</span></td>
+                <td>
+                    <div style="display:flex; gap:5px;">
+                        <button onclick="confirmTimerOrder('${o.orderId}')" style="background:#0c831f; padding:8px 12px;"><i class="fas fa-check"></i></button>
+                        <button onclick="updateStatus('${o.orderId}', 'cancelled')" style="background:#ef4444; padding:8px 12px;"><i class="fas fa-times"></i></button>
+                        <button onclick="viewTimerFeedbacks('${o.orderId}')" style="background:#3b82f6; padding:8px 12px;"><i class="fas fa-comment-dots"></i></button>
+                    </div>
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('timerOrdersTable').innerHTML = html;
+
+        // Auto-refresh timer every second
+        if (window.timerInterval) clearInterval(window.timerInterval);
+        window.timerInterval = setInterval(() => {
+            timerOrders.forEach(o => {
+                const el = document.getElementById(`timer-${o.orderId}`);
+                if (el) {
+                    const createdAt = new Date(o.createdAt).getTime();
+                    const now = Date.now();
+                    const elapsed = Math.floor((now - createdAt) / 1000);
+                    const remaining = Math.max(0, 115 - elapsed);
+                    el.innerText = `${remaining}s`;
+                    if (remaining < 20) el.style.color = '#ef4444';
+                    if (remaining <= 0) loadTimerOrders(); // Reload to refresh list
+                }
+            });
+        }, 1000);
+    }
+}
+window.confirmTimerOrder = async (orderId) => {
+    const res = await fetchAPI(`/api/admin/orders/${orderId}`, { method: 'PUT', body: JSON.stringify({ status: 'confirmed' }) });
+    if (res.success) {
+        showToast('Order confirmed successfully');
+        loadTimerOrders();
+    } else {
+        showToast(res.message || 'Failed to confirm order', true);
+    }
+};
+
+window.viewTimerFeedbacks = async (orderId) => {
+    const data = await fetchAPI('/api/admin/orders');
+    if (data.success) {
+        const order = data.orders.find(o => o.orderId === orderId);
+        if (!order || !order.timerFeedbacks || order.timerFeedbacks.length === 0) {
+            showToast('No feedbacks yet for this order');
+            return;
+        }
+
+        let html = '<div style="max-height:400px; overflow-y:auto;">';
+        order.timerFeedbacks.forEach(f => {
+            html += `
+                <div style="background:#f8fafc; padding:15px; border-radius:16px; margin-bottom:12px; border:1px solid #e2e8f0;">
+                    <div style="font-size:11px; color:#64748b; margin-bottom:4px; font-weight:bold;">QUESTION</div>
+                    <div style="font-weight:600; color:#1e293b; margin-bottom:10px;">${f.message}</div>
+                    <div style="font-size:11px; color:#0c831f; margin-bottom:4px; font-weight:bold;">USER RESPONSE</div>
+                    <div style="background:white; padding:10px; border-radius:8px; border:1px solid #dcfce7; color:#166534;">${f.response}</div>
+                    <div style="font-size:10px; color:#94a3b8; margin-top:8px; text-align:right;">${new Date(f.timestamp).toLocaleTimeString()}</div>
+                </div>`;
+        });
+        html += '</div>';
+
+        // Reuse existing modal if possible, but let's just show it in a custom alert/modal for simplicity
+        // For now, I'll use showConfirm but customize it or just use a toast if simple.
+        // Actually, let's create a temporary modal.
+        const modal = document.createElement('div');
+        modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);";
+        modal.innerHTML = `
+            <div style="background:white; padding:30px; border-radius:32px; width:500px; max-width:90%;">
+                <h3 style="margin-bottom:20px; display:flex; align-items:center; gap:10px;"><i class="fas fa-comments" style="color:#3b82f6;"></i> User Feedbacks</h3>
+                ${html}
+                <button onclick="this.closest('div').parentElement.remove()" style="width:100%; margin-top:20px; background:#1e293b; color:white; padding:12px; border-radius:14px; cursor:pointer;">Close</button>
+            </div>`;
+        document.body.appendChild(modal);
+    }
+};
+
 // Products
 async function loadProducts() {
     const data = await fetchAPI('/api/products');
@@ -402,12 +507,14 @@ document.querySelectorAll('.nav-item[data-section]').forEach(item => {
         document.getElementById('dashboardSection').style.display = section === 'dashboard' ? 'block' : 'none';
         document.getElementById('usersSection').style.display = section === 'users' ? 'block' : 'none';
         document.getElementById('ordersSection').style.display = section === 'orders' ? 'block' : 'none';
+        document.getElementById('timerOrdersSection').style.display = section === 'timer-orders' ? 'block' : 'none';
         document.getElementById('productsSection').style.display = section === 'products' ? 'block' : 'none';
         document.getElementById('supportSection').style.display = section === 'support' ? 'block' : 'none';
         document.getElementById('settingsSection').style.display = section === 'settings' ? 'block' : 'none';
         
         if(section === 'users') loadUsers();
         if(section === 'orders') loadOrders();
+        if(section === 'timer-orders') loadTimerOrders();
         if(section === 'products') loadProducts();
         if(section === 'support') loadSupportTickets();
         if(section === 'dashboard') loadDashboard();

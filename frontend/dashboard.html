@@ -470,12 +470,128 @@
                 <div class="order-right">
                     <span class="order-price">₹${o.total}</span>
                     <span class="status-badge ${o.status}">${o.status}</span>
+                    ${o.isTimerOrder && o.status === 'pending' ? `<div id="countdown-${o.orderId}" style="font-size:11px; color:#f59e0b; font-weight:700; margin-top:4px;">Starting at ${o.scheduledTime}</div>` : ''}
                     ${(o.status === 'pending' && (Date.now() - new Date(o.createdAt).getTime()) <= 120000)
                         ? `<button data-cancel-order="${o.orderId}" onclick="cancelMyOrder('${o.orderId}', this)" style="background:#ef4444;color:#fff;border:none;padding:6px 12px;border-radius:10px;cursor:pointer;font-weight:600;">Cancel Order</button>`
                         : ''}
                 </div>
             </div>`).join('');
+        
+        // Start countdown timers for scheduled orders
+        orders.filter(o => o.isTimerOrder && o.status === 'pending').forEach(o => {
+            updateOrderCountdown(o);
+        });
     }
+
+    function updateOrderCountdown(o) {
+        const el = document.getElementById(`countdown-${o.orderId}`);
+        if (!el) return;
+
+        const [hours, minutes] = o.scheduledTime.split(':').map(Number);
+        let scheduledDate = new Date();
+        scheduledDate.setHours(hours, minutes, 0, 0);
+        
+        const timer = setInterval(() => {
+            const now = new Date();
+            let diff = scheduledDate.getTime() - now.getTime();
+            
+            // Smart 12h/24h correction:
+            // If the time is in the past, check if adding 12 hours makes it a "soon" future time.
+            if (diff < 0) {
+                const altDate = new Date(scheduledDate.getTime() + 12 * 3600000);
+                const altDiff = altDate.getTime() - now.getTime();
+                if (altDiff > 0 && altDiff < 12 * 3600000) { // If it's in the next 12 hours
+                    scheduledDate = altDate;
+                    diff = altDiff;
+                } else {
+                    // Otherwise, it really is for the next day
+                    scheduledDate.setDate(scheduledDate.getDate() + 1);
+                    diff = scheduledDate.getTime() - now.getTime();
+                }
+            }
+
+            if (diff <= 0) {
+                el.innerText = "Starting now!";
+                clearInterval(timer);
+                refreshUserData(); 
+                return;
+            }
+
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            const s = Math.floor((diff % 60000) / 1000);
+            el.innerText = `Starts in: ${h > 0 ? h + 'h ' : ''}${m}m ${s}s`;
+        }, 1000);
+    }
+
+    // Boredom Killer Logic
+    const boredomMessages = [
+        "Your order is preparing! By the way, what is your favorite hobby? 🎨",
+        "Almost there! If you could travel anywhere right now, where would it be? ✈️",
+        "The kitchen is busy! Do you prefer coffee or tea while waiting? ☕",
+        "Good things take time. What's the last great movie you watched? 🍿",
+        "Stay hungry! What's your go-to comfort food? 🍕",
+        "Fun fact: DronaTeen is powered by students like you! 🚀",
+        "Quick quiz: What's the tallest building in the world? (It's Burj Khalifa!) 🏢"
+    ];
+
+    function startBoredomKiller() {
+        if (window.boredomInterval) return;
+        window.boredomInterval = setInterval(() => {
+            const activeOrders = Array.from(document.querySelectorAll('.history-item')).filter(el => {
+                const badge = el.querySelector('.status-badge');
+                return badge && (badge.classList.contains('pending') || badge.classList.contains('confirmed'));
+            });
+
+            if (activeOrders.length > 0) {
+                const orderId = activeOrders[0].querySelector('.order-id').innerText.replace('📦 ', '');
+                const msg = boredomMessages[Math.floor(Math.random() * boredomMessages.length)];
+                showEngagementPopup(msg, orderId);
+            }
+        }, 5 * 60 * 1000); // 5 minutes
+    }
+
+    function showEngagementPopup(msg, orderId) {
+        const popup = document.createElement('div');
+        popup.id = "engagementPopup";
+        popup.style = "position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:white; padding:25px; border-radius:24px; box-shadow:0 15px 40px rgba(0,0,0,0.15); z-index:5000; text-align:center; border:2px solid #0c831f; width:min(400px, 90vw); animation:fadeup 0.5s ease;";
+        popup.innerHTML = `
+            <div style="font-size:35px; margin-bottom:15px;">🌟</div>
+            <p style="font-weight:700; color:#1e293b; margin-bottom:15px; font-size:1.1rem;">${msg}</p>
+            <div id="engagementActions" style="display:flex; gap:12px; justify-content:center;">
+                <button onclick="this.closest('#engagementPopup').remove()" style="background:#f1f5f9; color:#475569; border:none; padding:10px 20px; border-radius:12px; cursor:pointer; font-weight:bold;">Ignore</button>
+                <button onclick="showEngagementInput('${msg}', '${orderId}')" style="background:#0c831f; color:white; border:none; padding:10px 24px; border-radius:12px; cursor:pointer; font-weight:bold;">Write</button>
+            </div>
+        `;
+        document.body.appendChild(popup);
+    }
+
+    window.showEngagementInput = (msg, orderId) => {
+        const container = document.getElementById('engagementActions');
+        container.innerHTML = `
+            <div style="width:100%;">
+                <input type="text" id="engagementResponse" placeholder="Type your answer here..." style="width:100%; padding:12px; border:1px solid #e2e8f0; border-radius:12px; margin-bottom:10px;">
+                <button onclick="submitEngagementResponse('${msg}', '${orderId}')" style="background:#0c831f; color:white; border:none; padding:10px 20px; border-radius:12px; cursor:pointer; font-weight:bold; width:100%;">Submit</button>
+            </div>
+        `;
+    };
+
+    window.submitEngagementResponse = async (msg, orderId) => {
+        const response = document.getElementById('engagementResponse').value;
+        if (!response) return;
+
+        const res = await fetchAPI(`/api/orders/${orderId}/timer-feedback`, {
+            method: 'POST',
+            body: JSON.stringify({ message: msg, response })
+        });
+
+        if (res.success) {
+            showToast('Feedback submitted! Thanks! ❤️');
+            document.getElementById('engagementPopup').remove();
+        }
+    };
+
+    startBoredomKiller();
     let pendingCancelOrderId = null;
     let pendingCancelBtn = null;
     const cancelOrderModal = document.getElementById('cancelOrderModal');

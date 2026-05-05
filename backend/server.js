@@ -47,6 +47,9 @@ const orderSchema = new mongoose.Schema({
     cancelReason: { type: String, default: '' },
     rating: { type: Number, min: 1, max: 5 },
     feedback: String,
+    isTimerOrder: { type: Boolean, default: false },
+    scheduledTime: { type: String, default: '' },
+    timerFeedbacks: [{ message: String, response: String, timestamp: { type: Date, default: Date.now } }],
     createdAt: { type: Date, default: Date.now }
 });
 const userSchema = new mongoose.Schema({
@@ -382,7 +385,7 @@ app.get('/api/receipts/:receiptNumber/verify', async (req, res) => {
 });
 app.post('/api/orders', authMiddleware, async (req, res) => {
     try {
-        const { items, total, paymentMethod, paymentId, walletUsed = 0 } = req.body;
+        const { items, total, paymentMethod, paymentId, walletUsed = 0, isTimerOrder = false, scheduledTime = '' } = req.body;
         const user = await User.findById(req.userId);
         if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
@@ -417,6 +420,8 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
             payableAmount,
             paymentMethod,
             paymentId,
+            isTimerOrder,
+            scheduledTime,
             status: 'pending'
         });
         await order.save();
@@ -460,19 +465,55 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
         }
         sendAdminAlert('New Order Placed', user, req, { orderAmount: total });
         
-        // Auto-confirm logic: If admin doesn't take action in 15 seconds, confirm automatically.
+        // Auto-confirm logic:
+        // Regular orders: 15 seconds
+        // Timer orders: At the scheduled time
+        let confirmTimeout = 15000;
+        
+        if (isTimerOrder && scheduledTime) {
+            try {
+                const [hours, minutes] = scheduledTime.split(':').map(Number);
+                const scheduledDate = new Date();
+                scheduledDate.setHours(hours, minutes, 0, 0);
+                
+                // If scheduled time is in the past, assume it's for today but immediate? 
+                // Or if it's very soon, just set a small delay.
+                const now = new Date();
+                let diff = scheduledDate.getTime() - now.getTime();
+                
+                // Smart 12h/24h correction:
+                // If the time is in the past, check if adding 12 hours makes it a "soon" future time.
+                if (diff < 0) {
+                    const altDate = new Date(scheduledDate.getTime() + 12 * 3600000);
+                    const altDiff = altDate.getTime() - now.getTime();
+                    if (altDiff > 0 && altDiff < 12 * 3600000) {
+                        scheduledDate.setTime(altDate.getTime());
+                        diff = altDiff;
+                    } else {
+                        // Otherwise, it really is for the next day
+                        scheduledDate.setDate(scheduledDate.getDate() + 1);
+                        diff = scheduledDate.getTime() - now.getTime();
+                    }
+                }
+                
+                confirmTimeout = Math.max(0, diff);
+            } catch (e) {
+                confirmTimeout = 115000; // Fallback
+            }
+        }
+        
         setTimeout(async () => {
             try {
                 const latestOrder = await Order.findOne({ orderId });
                 if (latestOrder && latestOrder.status === 'pending') {
                     latestOrder.status = 'confirmed';
                     await latestOrder.save();
-                    console.log(`[Auto-Confirm] Order ${orderId} confirmed after 15s timeout.`);
+                    console.log(`[Auto-Confirm] Order ${orderId} confirmed at scheduled time/timeout.`);
                 }
             } catch (err) {
                 console.error('[Auto-Confirm Error]', err.message);
             }
-        }, 15000);
+        }, confirmTimeout);
 
         res.status(201).json({ success: true, orderId, _id: order._id });
     } catch (err) {
@@ -497,6 +538,21 @@ app.put('/api/orders/:id/rate', authMiddleware, async (req, res) => {
 });
 
 // Support Tickets (User)
+// Submit Timer Feedback (Boredom Killer response)
+app.post('/api/orders/:orderId/timer-feedback', authMiddleware, async (req, res) => {
+    try {
+        const { message, response } = req.body;
+        const order = await Order.findOne({ orderId: req.params.orderId });
+        if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+        
+        order.timerFeedbacks.push({ message, response });
+        await order.save();
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 app.post('/api/support', authMiddleware, async (req, res) => {
     try {
         const { subject, orderId, message } = req.body;
