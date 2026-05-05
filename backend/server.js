@@ -460,6 +460,20 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
         }
         sendAdminAlert('New Order Placed', user, req, { orderAmount: total });
         
+        // Auto-confirm logic: If admin doesn't take action in 15 seconds, confirm automatically.
+        setTimeout(async () => {
+            try {
+                const latestOrder = await Order.findOne({ orderId });
+                if (latestOrder && latestOrder.status === 'pending') {
+                    latestOrder.status = 'confirmed';
+                    await latestOrder.save();
+                    console.log(`[Auto-Confirm] Order ${orderId} confirmed after 15s timeout.`);
+                }
+            } catch (err) {
+                console.error('[Auto-Confirm Error]', err.message);
+            }
+        }, 15000);
+
         res.status(201).json({ success: true, orderId, _id: order._id });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });

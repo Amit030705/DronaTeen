@@ -218,7 +218,22 @@
             <button id="cancelModalConfirmBtn" style="padding:10px 14px; border:none; border-radius:10px; background:#ef4444; color:#fff; cursor:pointer;">Yes, Cancel Order</button>
         </div>
     </div>
+    </div>
 </div>
+
+<!-- Order Confirmation Modal -->
+<div id="confirmationModal" class="modal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); backdrop-filter:blur(8px); z-index:4000; align-items:center; justify-content:center;">
+    <div style="background:white; border-radius:32px; padding:40px; width:450px; max-width:90%; text-align:center; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); border: 2px solid #0c831f;">
+        <div style="font-size: 60px; color: #0c831f; margin-bottom: 20px;"><i class="fas fa-check-circle"></i></div>
+        <h2 style="font-weight: 800; font-size: 1.8rem; color: #0c831f; margin-bottom: 15px;">Order Confirmed!</h2>
+        <p style="color: #1e293b; font-size: 1.1rem; line-height: 1.6; margin-bottom: 25px;">
+            We are preparing your order! <br>
+            Please wait and look for the delivery partner.
+        </p>
+        <button id="closeConfirmModalBtn" style="background:#0c831f; color:white; border:none; border-radius:60px; padding:14px; width:100%; font-weight:bold; cursor:pointer;">Awesome!</button>
+    </div>
+</div>
+
 <script>
     const API_BASE = '';
     let token = localStorage.getItem('droneToken');
@@ -622,6 +637,44 @@
     window.addEventListener('click', (e) => { if (e.target !== logoutModal && !logoutModal.contains(e.target) && e.target.id !== 'logoutBtn' && e.target.id !== 'logoutIcon') hideLogoutModal(); });
 
     loadDashboard();
+
+    // Polling logic for confirmation popup
+    let statusPollInterval = null;
+    function checkPendingOrders() {
+        if (statusPollInterval) return;
+        
+        statusPollInterval = setInterval(async () => {
+            try {
+                const res = await fetchAPI('/api/user/orders');
+                if (res.success) {
+                    const pendingOrders = res.orders.filter(o => o.status === 'pending');
+                    // We only want to alert for orders that *just* transitioned.
+                    // This is a simple version: if no pending orders exist but we saw some before, or just check recent orders.
+                    // Actually, let's look for "confirmed" orders that were created recently.
+                    const recentConfirmed = res.orders.find(o => o.status === 'confirmed' && (Date.now() - new Date(o.createdAt).getTime()) < 60000);
+                    
+                    if (recentConfirmed) {
+                        // Check if we already showed alert for this orderId to avoid repeating
+                        const lastAlertedId = localStorage.getItem('lastConfirmedAlertId');
+                        if (lastAlertedId !== recentConfirmed.orderId) {
+                            showConfirmationPopup();
+                            localStorage.setItem('lastConfirmedAlertId', recentConfirmed.orderId);
+                        }
+                    }
+                }
+            } catch (err) {}
+        }, 5000);
+    }
+
+    function showConfirmationPopup() {
+        document.getElementById('confirmationModal').style.display = 'flex';
+    }
+
+    document.getElementById('closeConfirmModalBtn').onclick = () => {
+        document.getElementById('confirmationModal').style.display = 'none';
+    };
+
+    checkPendingOrders();
 </script>
 </body>
 </html>

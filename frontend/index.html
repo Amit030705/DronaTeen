@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -331,6 +331,19 @@
     </div>
 </div>
 
+<!-- Order Confirmation Modal -->
+<div id="confirmationModal" class="modal" style="z-index: 4000;">
+    <div class="modal-content" style="max-width: 450px; text-align: center; padding: 40px 30px; border-radius: 32px; border: 2px solid #0c831f;">
+        <div style="font-size: 60px; color: #0c831f; margin-bottom: 20px;"><i class="fas fa-check-circle"></i></div>
+        <h2 style="font-weight: 800; font-size: 1.8rem; color: #0c831f; margin-bottom: 15px;">Order Confirmed!</h2>
+        <p style="color: #1e293b; font-size: 1.1rem; line-height: 1.6; margin-bottom: 25px;">
+            We are preparing your order! <br>
+            Please wait and look for the delivery partner.
+        </p>
+        <button id="closeConfirmModalBtn" class="pay-btn" style="margin-top: 0; width: 100%;">Awesome!</button>
+    </div>
+</div>
+
 <!-- Help Me Bot -->
 <div id="botBtn"><i class="fas fa-robot"></i></div>
 <div id="chatWindow">
@@ -559,10 +572,13 @@
             if (isSoldOut) stockHtml = `<div class="stock-badge stock-out">Sold Out</div>`;
             else if (isLowStock) stockHtml = `<div class="stock-badge stock-low">Only ${prod.stock} left</div>`;
 
+            let discountBadge = (prod.discountPercent > 0) ? `<div class="stock-badge" style="top: 15px; left: 15px; right: auto; background: #0c831f; color: white;">${prod.discountPercent}% OFF</div>` : '';
+
             let overlayHtml = isSoldOut ? `<div class="sold-out-overlay">Sold Out</div>` : '';
 
             card.innerHTML = `
                 ${stockHtml}
+                ${discountBadge}
                 <div class="product-image">
                     ${overlayHtml}
                     <img src="${prod.image || 'https://via.placeholder.com/200?text=' + encodeURIComponent(prod.name)}" alt="${prod.name}" loading="lazy">
@@ -703,6 +719,9 @@
                 const ratingModal = document.getElementById('ratingModal');
                 ratingModal.style.display = 'flex';
                 ratingModal.dataset.orderId = data._id; // Store order ID
+
+                // Start polling for confirmation status
+                startOrderStatusPolling(data.orderId);
             } else {
                 showToast('Order failed: ' + data.message, true);
             }
@@ -710,6 +729,42 @@
             showToast('Server error. Please try again.', true);
         }
     }
+
+    // Polling logic for order status
+    let statusPollInterval = null;
+    function startOrderStatusPolling(orderId) {
+        if (statusPollInterval) clearInterval(statusPollInterval);
+        
+        statusPollInterval = setInterval(async () => {
+            try {
+                const res = await fetch('/api/user/orders', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const order = data.orders.find(o => o.orderId === orderId);
+                    if (order && order.status !== 'pending') {
+                        clearInterval(statusPollInterval);
+                        if (order.status === 'confirmed') {
+                            showConfirmationPopup();
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Polling error:', err);
+            }
+        }, 3000); // Check every 3 seconds
+    }
+
+    function showConfirmationPopup() {
+        const modal = document.getElementById('confirmationModal');
+        modal.style.display = 'flex';
+        // Add a slight delay for rating modal if it's open, but actually we want them to see the confirmation.
+    }
+
+    document.getElementById('closeConfirmModalBtn').onclick = () => {
+        document.getElementById('confirmationModal').style.display = 'none';
+    };
 
     // Process payment
     payNowBtn.addEventListener('click', () => {
