@@ -7,40 +7,70 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <style>
-        .auth-container { max-width: 500px; margin: 40px auto; }
-        select { width: 100%; padding: 12px; border-radius: 60px; border: 1px solid #e2e8f0; margin-bottom: 16px; background: white; }
+        .auth-container { max-width: 480px; }
+        select { 
+            width: 100%; 
+            padding: 14px 24px; 
+            border-radius: 16px; 
+            border: 2px solid #f1f5f9; 
+            margin-bottom: 20px; 
+            background: #f8fafc;
+            font-size: 15px;
+            appearance: none;
+            cursor: pointer;
+        }
+        .select-wrapper { position: relative; }
+        .select-wrapper::after {
+            content: '\f078';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            right: 20px;
+            top: 18px;
+            color: #64748b;
+            pointer-events: none;
+            font-size: 12px;
+        }
     </style>
 </head>
-<body>
-<div class="auth-container">
-    <div class="logo" style="text-align:center; font-size:32px;"><i class="fas fa-bolt"></i> DronTeen</div>
-    <h2>Create Account</h2>
-    <form id="registerForm">
-        <input type="text" id="fullName" placeholder="Full Name" required>
-        <div class="error-message" id="nameError"></div>
+<body class="auth-page">
+    <div class="auth-container">
+        <div class="logo"><i class="fas fa-bolt"></i> <span>DronTeen</span></div>
+        <h2>Create Account</h2>
+        <form id="registerForm">
+            <input type="text" id="fullName" placeholder="Full Name" required>
+            <div class="error-message" id="nameError"></div>
 
-        <input type="email" id="email" placeholder="Email Address" required>
-        <div class="error-message" id="emailError"></div>
+            <input type="email" id="email" placeholder="Email Address" required>
+            <div class="error-message" id="emailError"></div>
 
-        <input type="password" id="password" placeholder="Password (min 6 characters)" required>
-        <div class="error-message" id="passwordError"></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div>
+                    <input type="password" id="password" placeholder="Password" required>
+                    <div class="error-message" id="passwordError"></div>
+                </div>
+                <div>
+                    <input type="password" id="confirmPassword" placeholder="Confirm" required>
+                    <div class="error-message" id="confirmError"></div>
+                </div>
+            </div>
 
-        <input type="password" id="confirmPassword" placeholder="Confirm Password" required>
-        <div class="error-message" id="confirmError"></div>
+            <input type="text" id="address" placeholder="Delivery Address" value="Greater Noida, Noida">
 
-        <input type="text" id="address" placeholder="Delivery Address (optional)" value="Greater Noida, Noida">
+            <div class="select-wrapper">
+                <select id="prefPayment">
+                    <option value="UPI">UPI (Google Pay, PhonePe)</option>
+                    <option value="Card">Credit/Debit Card</option>
+                    <option value="COD">Cash on Delivery</option>
+                </select>
+            </div>
 
-        <select id="prefPayment">
-            <option value="UPI">UPI (Google Pay, PhonePe)</option>
-            <option value="Card">Credit/Debit Card</option>
-            <option value="COD">Cash on Delivery</option>
-        </select>
+            <button type="submit">Join DronTeen</button>
+            <div class="error-message" id="registerError" style="text-align:center; margin-top:12px;"></div>
+        </form>
+        <div class="login-link">Already have an account? <a href="login.html">Login</a></div>
+    </div>
 
-        <button type="submit">Sign Up</button>
-        <div class="error-message" id="registerError" style="text-align:center; margin-top:12px;"></div>
-    </form>
-    <div class="login-link">Already have an account? <a href="login.html">Login</a></div>
-</div>
 <script>
     const form = document.getElementById('registerForm');
     const fullName = document.getElementById('fullName');
@@ -66,8 +96,8 @@
         if (!email.value.trim()) { emailError.textContent = 'Email required'; emailError.style.display = 'block'; valid = false; }
         else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) { emailError.textContent = 'Invalid email'; emailError.style.display = 'block'; valid = false; }
         if (!password.value) { passwordError.textContent = 'Password required'; passwordError.style.display = 'block'; valid = false; }
-        else if (password.value.length < 6) { passwordError.textContent = 'Minimum 6 characters'; passwordError.style.display = 'block'; valid = false; }
-        if (password.value !== confirm.value) { confirmError.textContent = 'Passwords do not match'; confirmError.style.display = 'block'; valid = false; }
+        else if (password.value.length < 6) { passwordError.textContent = 'Min 6 characters'; passwordError.style.display = 'block'; valid = false; }
+        if (password.value !== confirm.value) { confirmError.textContent = 'Mismatch'; confirmError.style.display = 'block'; valid = false; }
         if (!valid) return;
 
         try {
@@ -86,7 +116,7 @@
             if (data.success) {
                 localStorage.setItem('droneToken', data.token);
                 localStorage.setItem('userEmail', data.user.email);
-                alert('Account created! Redirecting...');
+                localStorage.setItem('userName', data.user.name);
                 window.location.href = '/dashboard.html';
             } else {
                 registerError.textContent = data.message || 'Registration failed';

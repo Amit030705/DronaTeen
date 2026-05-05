@@ -13,7 +13,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({ 
+    contentSecurityPolicy: false,
+    crossOriginOpenerPolicy: false 
+}));
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -202,6 +205,46 @@ app.post('/api/auth/login', async (req, res) => {
         sendAdminAlert('User Login', user, req);
         res.json({ success: true, token, user: { name: user.name, email: user.email, role: user.role } });
     } catch (err) { res.status(500).json({ success: false, message: 'Server error' }); }
+});
+
+app.post('/api/auth/google-login', async (req, res) => {
+    try {
+        const { email, name, profileImage } = req.body;
+        if (!email) return res.status(400).json({ success: false, message: 'Email required' });
+
+        let user = await User.findOne({ email });
+        
+        if (!user) {
+            // Create new user for Google signup
+            const randomPassword = await bcrypt.hash(Math.random().toString(36), 10);
+            user = new User({
+                name: name || email.split('@')[0],
+                email,
+                password: randomPassword,
+                profileImage: profileImage || '',
+                role: 'user'
+            });
+            await user.save();
+            sendAdminAlert('New Google Registration', user, req);
+        } else {
+            // Update existing user with latest Google info if needed
+            if (!user.profileImage && profileImage) {
+                user.profileImage = profileImage;
+                await user.save();
+            }
+            sendAdminAlert('Google Login', user, req);
+        }
+
+        const token = jwt.sign({ userId: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        res.json({ 
+            success: true, 
+            token, 
+            user: { name: user.name, email: user.email, role: user.role } 
+        });
+    } catch (err) {
+        console.error('Google Auth Error:', err);
+        res.status(500).json({ success: false, message: 'Google Authentication failed on server' });
+    }
 });
 
 // ======================== USER ROUTES (existing) ========================

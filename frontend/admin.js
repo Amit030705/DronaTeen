@@ -73,7 +73,7 @@ async function loadDashboard() {
         data.recentOrders.forEach(o => {
             ordersHtml += `<tr><td>${o.orderId}</td><td>${o.userId?.name || 'N/A'}</td><td>Rs ${o.total}</td><td><span class="status-badge status-${o.status}">${o.status}</span></td><td>${new Date(o.createdAt).toLocaleDateString()}</td></tr>`;
         });
-        ordersHtml += ';</table>';
+        ordersHtml += '</table>';
         document.getElementById('recentOrdersTable').innerHTML = ordersHtml;
         // Chart
         const revenueData = data.recentOrders.map(o => o.total);
