@@ -154,5 +154,5 @@ If **DronaTeen** helps you or your campus, please consider giving it a **Star** 
 ---
 <div align="center">
   <p>Built with ❤️ for a Smarter Campus Experience.</p>
-  <p>© 2024 DronaTeen Project</p>
+  <p>© 2026 DronaTeen Project</p>
 </div>
